@@ -84,7 +84,9 @@ error for slightly less cost.
 
 ![cost-aware length allocation](docs/figures/cost_aware_lengthmap.png)
 
-A visual explainer of the whole system is in [`docs/overview.html`](docs/overview.html).
+Two self-contained HTML pages document the project: [`docs/overview.html`](docs/overview.html)
+explains the concept and the math; [`docs/results.html`](docs/results.html) analyses the
+measured campaign results (acquisition comparison, error maps, and the cost-aware length policy).
 
 ## Running
 
