@@ -1,0 +1,17 @@
+# python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# campaign data & outputs (regenerable / large)
+data/
+results/
+*.duckdb
+*.duckdb.wal
+
+# tooling / local
+.claude/
+notebooks/
+.env

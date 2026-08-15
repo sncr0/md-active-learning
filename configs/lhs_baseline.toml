@@ -1,0 +1,27 @@
+# Honest non-adaptive baseline: space-filling design, ignores the surrogate.
+name = "lhs_baseline"
+observable = "pressure"
+seed = 0
+
+[domain]                       # supercritical box (§3.2) — excludes coexistence dome
+temperature = [1.35, 3.0]      # T*
+density = [0.05, 0.9]          # rho*
+
+[acquisition]
+strategy = "latin_hypercube"
+
+[budget]
+n_initial = 120               # LHS places its whole budget up front
+n_total = 120
+batch = 8                     # matches the executor pool width
+
+[run_defaults]                # every RunConfig field except the state point
+n_particles = 864
+n_steps = 100000
+equil_steps = 20000
+sample_interval = 100
+timestep = 0.005
+thermostat = "langevin"
+friction = 1.0
+cutoff = 2.5
+tail_correction = true

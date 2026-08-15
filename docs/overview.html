@@ -1,0 +1,637 @@
+<title>Deciding What to Simulate</title>
+<style>
+  :root{
+    --paper:#f5f6f8; --panel:#fbfcfd; --ink:#171b22; --muted:#5b6572;
+    --hair:#dce0e6; --hair-strong:#c4cad2;
+    --amber:#b0640f; --amber-soft:#e7c08a; --teal:#2b7a83; --teal-soft:#8fc4c9;
+    --accent:var(--amber);
+    --serif:"Iowan Old Style","Palatino Linotype","Palatino","Book Antiqua",Georgia,Cambria,serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --measure:66ch;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#0f1319; --panel:#151a21; --ink:#e7eaef; --muted:#98a2af;
+      --hair:#242a33; --hair-strong:#333b46;
+      --amber:#e0a24a; --amber-soft:#7a561f; --teal:#57b6bf; --teal-soft:#2c4f52;
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#f5f6f8; --panel:#fbfcfd; --ink:#171b22; --muted:#5b6572;
+    --hair:#dce0e6; --hair-strong:#c4cad2;
+    --amber:#b0640f; --amber-soft:#e7c08a; --teal:#2b7a83; --teal-soft:#8fc4c9;
+  }
+  :root[data-theme="dark"]{
+    --paper:#0f1319; --panel:#151a21; --ink:#e7eaef; --muted:#98a2af;
+    --hair:#242a33; --hair-strong:#333b46;
+    --amber:#e0a24a; --amber-soft:#7a561f; --teal:#57b6bf; --teal-soft:#2c4f52;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--serif); font-size:18px; line-height:1.66;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--measure); margin:0 auto; padding:0 24px 8rem}
+  header{max-width:var(--measure); margin:0 auto; padding:5.5rem 24px 2.2rem}
+  .eyebrow{
+    font-family:var(--mono); font-size:.72rem; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 1.1rem;
+  }
+  h1{
+    font-size:clamp(2.3rem,6vw,3.3rem); line-height:1.04; font-weight:600;
+    letter-spacing:-.015em; margin:0 0 1rem; text-wrap:balance;
+  }
+  .deck{font-size:1.18rem; color:var(--muted); margin:0; max-width:56ch; text-wrap:pretty}
+  .meta{
+    font-family:var(--mono); font-size:.74rem; color:var(--muted);
+    letter-spacing:.03em; margin-top:1.8rem; padding-top:1.2rem;
+    border-top:1px solid var(--hair); display:flex; flex-wrap:wrap; gap:.4rem 1.6rem;
+  }
+  .meta b{color:var(--ink); font-weight:600}
+  article{counter-reset:eqn}
+  section{margin-top:3.4rem}
+  h2{
+    font-size:1.42rem; font-weight:600; letter-spacing:-.01em; margin:0 0 .9rem;
+    display:flex; align-items:baseline; gap:.7rem; text-wrap:balance;
+  }
+  h2 .n{
+    font-family:var(--mono); font-size:.8rem; color:var(--accent);
+    font-weight:500; letter-spacing:.05em;
+  }
+  p{margin:0 0 1.05rem; text-wrap:pretty}
+  strong{font-weight:600}
+  v{font-style:italic; font-family:var(--serif)}
+  .lede::first-letter{
+    font-size:3.1rem; float:left; line-height:.82; padding:.15rem .12em 0 0;
+    color:var(--accent); font-weight:600;
+  }
+  a{color:var(--accent)}
+  .note{color:var(--muted)}
+  code,.mono{font-family:var(--mono); font-size:.86em}
+  /* equations */
+  math{font-size:1.08em; color:var(--ink)}
+  .eqn{
+    display:grid; grid-template-columns:1fr auto; align-items:center; gap:1rem;
+    margin:1.5rem 0; padding:.2rem 0;
+  }
+  .eq{overflow-x:auto; overflow-y:hidden; padding:.35rem .2rem}
+  .eqn .num{font-family:var(--mono); font-size:.78rem; color:var(--muted)}
+  .eqn .num::before{counter-increment:eqn; content:"(" counter(eqn) ")"}
+  /* callout list for the three properties / acquisitions */
+  .stack{list-style:none; margin:1.4rem 0; padding:0; display:grid; gap:1px; background:var(--hair); border:1px solid var(--hair); border-radius:10px; overflow:hidden}
+  .stack li{background:var(--panel); padding:1rem 1.15rem}
+  .stack .k{font-family:var(--mono); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); display:block; margin-bottom:.3rem}
+  .stack.teal .k{color:var(--teal)}
+  .stack li p{margin:0; font-size:.98rem}
+  /* figures */
+  figure{margin:2.2rem 0; padding:0}
+  .plate{
+    background:var(--panel); border:1px solid var(--hair); border-radius:12px;
+    padding:1.1rem 1.1rem .6rem;
+  }
+  .plate svg{display:block; width:100%; height:auto}
+  figcaption{
+    font-family:var(--mono); font-size:.75rem; line-height:1.5; color:var(--muted);
+    margin-top:.9rem; letter-spacing:.01em;
+  }
+  figcaption b{color:var(--ink); font-weight:600}
+  /* svg semantic classes (theme-aware via tokens) */
+  .s-ink{stroke:var(--ink)} .f-ink{fill:var(--ink)}
+  .s-hair{stroke:var(--hair-strong)} .s-muted{stroke:var(--muted)} .f-muted{fill:var(--muted)}
+  .s-amber{stroke:var(--amber)} .f-amber{fill:var(--amber)}
+  .s-teal{stroke:var(--teal)} .f-teal{fill:var(--teal)}
+  .lbl{font-family:var(--mono); font-size:11px; fill:var(--muted)}
+  .lbl-i{font-family:var(--serif); font-style:italic; font-size:13px; fill:var(--ink)}
+  .lbl-a{font-family:var(--mono); font-size:10.5px; fill:var(--amber)}
+  .lbl-t{font-family:var(--mono); font-size:10.5px; fill:var(--teal)}
+  .kicker{border-left:2px solid var(--accent); padding-left:1rem; margin:1.6rem 0; color:var(--muted); font-size:1.02rem}
+  .kicker b{color:var(--ink)}
+  hr{border:0; border-top:1px solid var(--hair); margin:3.2rem 0 0}
+  @media (max-width:560px){
+    body{font-size:16.5px}
+    .eqn{grid-template-columns:1fr} .eqn .num{display:none}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .plate{transition:border-color .2s}
+  }
+</style>
+
+<header>
+  <p class="eyebrow">Molecular Dynamics × Active Learning</p>
+  <h1>Deciding what to simulate</h1>
+  <p class="deck">A Lennard-Jones fluid is an oracle we can query. Every query is expensive, its
+  answer is noisy — and we choose how noisy. This is a policy for spending simulations wisely,
+  resting on uncertainty we can actually trust.</p>
+  <div class="meta">
+    <span><b>System</b>&nbsp; LJ fluid, NVT</span>
+    <span><b>Inputs</b>&nbsp; T*, ρ*</span>
+    <span><b>Reference</b>&nbsp; JZG equation of state</span>
+    <span><b>Goal</b>&nbsp; response surface, min. cost</span>
+  </div>
+</header>
+
+<div class="wrap">
+<article>
+
+  <p class="lede">The one-line version: we want the map of a bulk property — say pressure —
+  across a plane of thermodynamic states, and we want it for the fewest simulations possible.
+  A surrogate model predicts the map and reports where it is unsure; a decision policy reads that
+  uncertainty and picks the next state to simulate. The subtlety, and the entire point, is that
+  the oracle's uncertainty is neither uniform nor fixed — and getting it <em>honest</em> is what
+  makes the policy work.</p>
+
+  <!-- ================= 01 ================= -->
+  <section>
+    <h2><span class="n">01</span> The system</h2>
+    <p>A single-site <strong>Lennard-Jones fluid</strong>: <v>N</v> structureless particles in a
+    periodic cubic box, interacting through one pair potential and nothing else — no bonds, no
+    charges, no chemistry. Each pair at separation <v>r</v> feels</p>
+
+    <div class="eqn">
+      <div class="eq">
+        <math display="block">
+          <mrow>
+            <mi>U</mi><mo>(</mo><mi>r</mi><mo>)</mo><mo>=</mo><mn>4</mn><mi>ε</mi>
+            <mo stretchy="false">[</mo>
+            <msup><mrow><mo>(</mo><mfrac><mi>σ</mi><mi>r</mi></mfrac><mo>)</mo></mrow><mn>12</mn></msup>
+            <mo>−</mo>
+            <msup><mrow><mo>(</mo><mfrac><mi>σ</mi><mi>r</mi></mfrac><mo>)</mo></mrow><mn>6</mn></msup>
+            <mo stretchy="false">]</mo>
+          </mrow>
+        </math>
+      </div><span class="num"></span>
+    </div>
+
+    <p>Truncated at <span class="mono">2.5σ</span> with analytic tail corrections. We work in
+    <strong>reduced units</strong> (σ = ε = m = 1), so the whole phase diagram collapses onto two
+    dimensionless knobs: reduced temperature <v>T</v>* and reduced density
+    <v>ρ</v>* = <v>N</v>σ³ / <v>V</v>. We fix <v>N</v>, <v>V</v>, <v>T</v> — the <strong>NVT</strong>
+    ensemble — with a thermostat, let the box equilibrate, and read out bulk observables: reduced
+    pressure <v>P</v>*, potential energy <v>U</v>*, and later the self-diffusion coefficient
+    <v>D</v>*.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 520 260" role="img" aria-label="Lennard-Jones particles in a periodic box with an interaction cutoff.">
+          <!-- box -->
+          <rect x="30" y="24" width="232" height="212" rx="3" class="s-ink" fill="none" stroke-width="1.4"/>
+          <!-- ghost images (PBC) faint, on opposite edges -->
+          <g opacity="0.28">
+            <circle cx="18" cy="150" r="7" class="f-muted"/>
+            <circle cx="274" cy="150" r="7" class="f-muted"/>
+            <circle cx="120" cy="12" r="7" class="f-muted"/>
+            <circle cx="120" cy="248" r="7" class="f-muted"/>
+          </g>
+          <!-- particles -->
+          <g class="f-ink">
+            <circle cx="70" cy="70" r="7"/><circle cx="120" cy="52" r="7"/>
+            <circle cx="200" cy="66" r="7"/><circle cx="236" cy="110" r="7"/>
+            <circle cx="86" cy="132" r="7"/><circle cx="170" cy="120" r="7"/>
+            <circle cx="52" cy="196" r="7"/><circle cx="112" cy="184" r="7"/>
+            <circle cx="196" cy="176" r="7"/><circle cx="240" cy="206" r="7"/>
+            <circle cx="150" cy="220" r="7"/><circle cx="222" cy="150" r="7"/>
+          </g>
+          <!-- highlighted particle + cutoff -->
+          <circle cx="130" cy="128" r="56" class="s-amber" fill="none" stroke-width="1.2" stroke-dasharray="3 4"/>
+          <circle cx="130" cy="128" r="8" class="f-amber"/>
+          <line x1="130" y1="128" x2="186" y2="128" class="s-amber" stroke-width="1"/>
+          <text x="150" y="120" class="lbl-a">rc = 2.5σ</text>
+          <!-- thermostat glyph -->
+          <path d="M300 60 q8 -12 16 0 t16 0 t16 0" class="s-amber" fill="none" stroke-width="1.4"/>
+          <text x="300" y="86" class="lbl">thermostat → fixes T*</text>
+          <!-- density annotation -->
+          <text x="300" y="150" class="lbl-i">ρ* = Nσ³ / V</text>
+          <text x="300" y="168" class="lbl">particles per unit volume</text>
+          <text x="300" y="206" class="lbl-i">the two knobs:</text>
+          <text x="300" y="224" class="lbl-a">T*</text><text x="322" y="224" class="lbl">temperature</text>
+          <text x="300" y="240" class="lbl-a">ρ*</text><text x="322" y="240" class="lbl">density</text>
+        </svg>
+      </div>
+      <figcaption><b>Fig 1 — The oracle.</b> One pair potential, a periodic box, a thermostat.
+      Set (T*, ρ*), run, and the box reports a bulk number. The dashed circle is the interaction
+      range; faint discs are periodic images.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================= 02 ================= -->
+  <section>
+    <h2><span class="n">02</span> What we are learning</h2>
+    <p>For each observable we want the <strong>response surface</strong> over the (T*, ρ*) plane —
+    the field <v>P</v>*(<v>T</v>*, <v>ρ</v>*), and likewise for energy and diffusion. Normally a
+    surrogate's accuracy can only be checked on a handful of held-out points. Here it can be checked
+    <em>everywhere</em>: the LJ fluid has an accurate analytic equation of state (Johnson–Zollweg–Gubbins,
+    good to ~1%), so we can evaluate the surrogate's error on a dense grid against ground truth.
+    The deliverable is not a fit — it is a <strong>measured error map</strong>.</p>
+    <p class="note">One restriction. Below the critical temperature (<v>T</v>*<sub>c</sub> ≈ 1.31),
+    inside the liquid–vapour dome, an NVT box phase-separates: pressure stops being a smooth function
+    of the inputs and the surrogate would be trying to fit a discontinuity. We stay supercritical,
+    <v>T</v>* ≥ 1.35 — which keeps the genuinely hard part (sharp curvature and violent fluctuations
+    near criticality) and drops the part that isn't well posed.</p>
+  </section>
+
+  <!-- ================= 03 ================= -->
+  <section>
+    <h2><span class="n">03</span> Why the oracle is awkward</h2>
+    <p>Three properties separate this from a textbook regression problem. The third is the one that
+    makes it worth building.</p>
+    <ul class="stack">
+      <li><span class="k">01 · Expensive</span>
+        <p>Seconds to hours per query. The input plane cannot be brute-forced; every simulation must earn its place.</p></li>
+      <li><span class="k">02 · Noisy, non-uniformly</span>
+        <p>Every observable is a finite-sample estimate from a correlated time series. The noise magnitude varies by orders of magnitude across the plane — tiny in the dense liquid, enormous near criticality.</p></li>
+      <li><span class="k">03 · The noise is a control variable</span>
+        <p>Run longer and the noise shrinks, predictably, as ≈ 1/√N<sub>eff</sub>. So <em>how precisely do I want to know this point</em> is not a fixed property — it is a decision, traded against compute.</p></li>
+    </ul>
+    <div class="kicker">Properties 2 and 3 together are the whole problem: an oracle where you choose
+    both <b>where</b> to query and <b>how precisely</b>. That is experimental design, not curve fitting.</div>
+  </section>
+
+  <!-- ================= 04 ================= -->
+  <section>
+    <h2><span class="n">04</span> From a trajectory to a number you can trust</h2>
+    <p>This is the layer everything else stands on. A run produces a trajectory; an observable is a
+    <strong>time average</strong> which, by ergodicity, estimates the ensemble average we actually
+    want:</p>
+
+    <div class="eqn">
+      <div class="eq">
+        <math display="block">
+          <mrow>
+            <mo>⟨</mo><mi>A</mi><mo>⟩</mo><mo>≈</mo>
+            <mover><mi>A</mi><mo>¯</mo></mover><mo>=</mo>
+            <mfrac><mn>1</mn><mi>M</mi></mfrac>
+            <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>M</mi></munderover>
+            <mi>A</mi><mo>(</mo><msub><mi>t</mi><mi>i</mi></msub><mo>)</mo>
+          </mrow>
+        </math>
+      </div><span class="num"></span>
+    </div>
+
+    <p>For pressure, <v>A</v> is the instantaneous <strong>virial</strong> — the ideal-gas term plus
+    the contribution of every pair force acting across the box:</p>
+
+    <div class="eqn">
+      <div class="eq">
+        <math display="block">
+          <mrow>
+            <mi>P</mi><mo>=</mo><mi>ρ</mi><msub><mi>k</mi><mi>B</mi></msub><mi>T</mi>
+            <mo>+</mo>
+            <mfrac><mn>1</mn><mrow><mn>3</mn><mi>V</mi></mrow></mfrac>
+            <mrow><mo>⟨</mo>
+              <munder><mo>∑</mo><mrow><mi>i</mi><mo>&lt;</mo><mi>j</mi></mrow></munder>
+              <msub><mi>𝐫</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>·</mo>
+              <msub><mi>𝐟</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub>
+            <mo>⟩</mo></mrow>
+          </mrow>
+        </math>
+      </div><span class="num"></span>
+    </div>
+
+    <p>Two facts make the obvious error bar wrong — and both are statistics, not chemistry.</p>
+    <p><strong>Equilibration.</strong> The opening stretch of the trajectory is not drawn from the
+    equilibrium distribution; the starting lattice is still relaxing. Those frames bias the average
+    and must be discarded at a detected cutoff <v>t</v><sub>0</sub>, not eyeballed.</p>
+    <p><strong>Correlation.</strong> Consecutive frames are not independent, so <v>M</v> frames are
+    worth far fewer than <v>M</v> independent samples. The variance of the mean is inflated by the
+    <strong>statistical inefficiency</strong> <v>g</v>:</p>
+
+    <div class="eqn">
+      <div class="eq">
+        <math display="block">
+          <mrow>
+            <mi>Var</mi><mo>(</mo><mover><mi>A</mi><mo>¯</mo></mover><mo>)</mo><mo>=</mo>
+            <mfrac><msubsup><mi>σ</mi><mi>A</mi><mn>2</mn></msubsup><msub><mi>N</mi><mtext>eff</mtext></msub></mfrac>
+            <mo>,</mo><mspace width="1.4em"/>
+            <msub><mi>N</mi><mtext>eff</mtext></msub><mo>=</mo><mfrac><mi>M</mi><mi>g</mi></mfrac>
+            <mo>,</mo><mspace width="1.4em"/>
+            <mi>g</mi><mo>=</mo><mn>1</mn><mo>+</mo><mn>2</mn>
+            <munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>∞</mi></munderover>
+            <mi>ρ</mi><mo>(</mo><mi>k</mi><mo>)</mo>
+          </mrow>
+        </math>
+      </div><span class="num"></span>
+    </div>
+
+    <p>Here <v>ρ</v>(<v>k</v>) is the autocorrelation at lag <v>k</v>. Typically <v>g</v> ≈ 5–50;
+    ignoring it — reporting <span class="mono">σ/√M</span> — makes the error bar 2–7× too small.
+    That is exactly the number a decision policy will consume, so a wrong <v>σ</v> here corrupts
+    everything downstream silently.</p>
+
+    <figure>
+      <div class="plate">
+        <svg id="fig-traj" viewBox="0 0 520 250" role="img" aria-label="A correlated MD time series with an equilibration cutoff, reduced to a value with an effective-sample error bar."></svg>
+      </div>
+      <figcaption><b>Fig 2 — The estimator.</b> Discard the transient at <b>t₀</b>; average the
+      production window; attach an error bar sized by the <b>effective</b> sample count
+      N<sub>eff</sub> = M / g, not the raw frame count. The 120 frames shown carry only a few dozen
+      independent samples.</figcaption>
+    </figure>
+
+    <div class="kicker">And <b>σ<sub>A</sub></b> itself — the size of the fluctuations — is a strong
+    function of state. Near the critical point the compressibility diverges and pressure fluctuations
+    blow up. The noise is <b>heteroscedastic</b>, and that spatial structure is the signal, not a nuisance.</div>
+  </section>
+
+  <!-- ================= 05 ================= -->
+  <section>
+    <h2><span class="n">05</span> The surrogate</h2>
+    <p>We model each observable with a <strong>Gaussian process</strong>. It gives a predictive mean
+    and a calibrated variance at every point in the plane, and — the property that matters here — it
+    accepts a <strong>per-point observation-noise variance</strong>, which is precisely the
+    <v>σ</v>² the estimator produced. Each datum is</p>
+
+    <div class="eqn">
+      <div class="eq">
+        <math display="block">
+          <mrow>
+            <msub><mi>y</mi><mi>i</mi></msub><mo>=</mo>
+            <mi>f</mi><mo>(</mo><msub><mi>𝐱</mi><mi>i</mi></msub><mo>)</mo><mo>+</mo>
+            <msub><mi>ε</mi><mi>i</mi></msub><mo>,</mo><mspace width="1.2em"/>
+            <msub><mi>ε</mi><mi>i</mi></msub><mo>∼</mo>
+            <mi>𝒩</mi><mo>(</mo><mn>0</mn><mo>,</mo>
+            <msubsup><mi>σ</mi><mi>n</mi><mn>2</mn></msubsup><mo>(</mo><msub><mi>𝐱</mi><mi>i</mi></msub><mo>)</mo><mo>)</mo>
+          </mrow>
+        </math>
+      </div><span class="num"></span>
+    </div>
+
+    <p>where <v>f</v> is the true latent response surface and the noise variance
+    <v>σ</v><sub>n</sub>²(<v>x</v>) varies from point to point. (In practice this enters the GP as the
+    per-point diagonal of the noise covariance — a single global noise level, the usual default, would
+    average away exactly the heteroscedastic structure we care about.) The GP's predictive variance
+    then splits cleanly into two parts:</p>
+
+    <div class="eqn">
+      <div class="eq">
+        <math display="block">
+          <mrow>
+            <munder><munder><msubsup><mi>s</mi><mtext>tot</mtext><mn>2</mn></msubsup><mo>⏟</mo></munder><mtext>total</mtext></munder>
+            <mo>(</mo><mi>𝐱</mi><mo>)</mo><mo>=</mo>
+            <munder><munder><msubsup><mi>s</mi><mtext>epi</mtext><mn>2</mn></msubsup><mo>⏟</mo></munder><mtext>epistemic</mtext></munder>
+            <mo>(</mo><mi>𝐱</mi><mo>)</mo><mo>+</mo>
+            <munder><munder><msubsup><mi>σ</mi><mi>n</mi><mn>2</mn></msubsup><mo>⏟</mo></munder><mtext>aleatoric</mtext></munder>
+            <mo>(</mo><mi>𝐱</mi><mo>)</mo>
+          </mrow>
+        </math>
+      </div><span class="num"></span>
+    </div>
+
+    <p><strong>Epistemic</strong> variance is what the model does not yet know; it is
+    <em>reducible</em> — more data shrinks it, and it vanishes right at an observed point.
+    <strong>Aleatoric</strong> variance is the irreducible measurement noise at the chosen run length;
+    only a <em>longer</em> simulation shrinks it. Keeping these apart is the whole game.</p>
+
+    <figure>
+      <div class="plate">
+        <svg id="fig-gp" viewBox="0 0 520 300" role="img" aria-label="A one-dimensional Gaussian process fit showing total versus epistemic uncertainty bands over heteroscedastic data."></svg>
+      </div>
+      <figcaption><b>Fig 3 — Two kinds of not-knowing.</b> The wide <span style="color:var(--amber)">amber</span>
+      band is total uncertainty; the inner <span style="color:var(--teal)">teal</span> band is
+      epistemic only. On the left, near criticality, the error bars are large but the band is mostly
+      <em>irreducible noise</em>. In the gap on the right, the model is genuinely ignorant — high
+      epistemic variance, low noise. These call for opposite actions.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================= 06 ================= -->
+  <section>
+    <h2><span class="n">06</span> The decision</h2>
+    <p>Active learning chooses the next state by maximizing an <strong>acquisition function</strong>
+    over the plane. The obvious one — go where predictive variance is largest — fails, and failing on
+    purpose is instructive:</p>
+
+    <ul class="stack teal">
+      <li><span class="k">Naïve · maximum variance</span>
+        <p>a(𝐱) = s²<sub>tot</sub>(𝐱) = s²<sub>epi</sub>(𝐱) + σ²<sub>n</sub>(𝐱). Maximized where the
+        <em>noise</em> is largest — so the policy parks in the noisiest region and resamples it forever.
+        Its epistemic variance was already low; only the irreducible term is big, and that term never
+        drops. It learns almost nothing.</p></li>
+      <li><span class="k">Fix 1 · epistemic only</span>
+        <p>a(𝐱) = s²<sub>epi</sub>(𝐱). Query where the <em>function</em> is uncertain, ignoring
+        irreducible noise. Simple, and it no longer chases the critical region for its noise alone.</p></li>
+      <li><span class="k">Fix 2 · integrated variance reduction (ALC / IMSE)</span>
+        <p>Score a candidate by how much it shrinks uncertainty <em>everywhere</em>, not by how
+        uncertain it is itself — a decision-theoretic criterion:</p></li>
+    </ul>
+
+    <div class="eqn">
+      <div class="eq">
+        <math display="block">
+          <mrow>
+            <msub><mi>a</mi><mtext>imse</mtext></msub><mo>(</mo><mi>𝐱</mi><mo>)</mo><mo>=</mo>
+            <msub><mo>∫</mo><mi>𝒳</mi></msub>
+            <mrow><mo>[</mo>
+              <msubsup><mi>s</mi><mtext>epi</mtext><mn>2</mn></msubsup><mo>(</mo><msup><mi>𝐱</mi><mo>′</mo></msup><mo>)</mo>
+              <mo>−</mo>
+              <msubsup><mi>s</mi><mtext>epi</mtext><mrow><mn>2</mn><mo>,</mo><mspace width=".15em"/><mo>+</mo><mi>𝐱</mi></mrow></msubsup>
+              <mo>(</mo><msup><mi>𝐱</mi><mo>′</mo></msup><mo>)</mo>
+            <mo>]</mo></mrow>
+            <mspace width=".2em"/><mi>d</mi><msup><mi>𝐱</mi><mo>′</mo></msup>
+          </mrow>
+        </math>
+      </div><span class="num"></span>
+    </div>
+
+    <p>The superscript <span class="mono">+𝐱</span> means "the posterior after adding a query at 𝐱."
+    The integral asks: if I simulate here, how much does the model's ignorance fall across the
+    <em>entire</em> domain? Reproducing the naïve failure and then beating it with these two, on the
+    same domain, is the core result of the first stage.</p>
+  </section>
+
+  <!-- ================= 07 ================= -->
+  <section>
+    <h2><span class="n">07</span> How it fits together</h2>
+    <p>Three layers, one direction of data flow. The oracle never learns which acquisition ran; the
+    surrogate never touches a trajectory. The estimator's honest <v>σ</v>² is the one seam that
+    couples the physics to the decision.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 520 170" role="img" aria-label="The active-learning loop: oracle, estimator, store, surrogate, decision, and back.">
+          <defs>
+            <marker id="ar" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" class="f-muted"/>
+            </marker>
+          </defs>
+          <g font-family="var(--mono)">
+            <!-- nodes -->
+            <g>
+              <rect x="8"  y="40" width="86" height="40" rx="7" class="s-amber" fill="none" stroke-width="1.3"/>
+              <text x="51" y="58" text-anchor="middle" class="lbl-a">oracle</text>
+              <text x="51" y="72" text-anchor="middle" class="lbl">run MD</text>
+            </g>
+            <g>
+              <rect x="118" y="40" width="92" height="40" rx="7" class="s-amber" fill="none" stroke-width="1.3"/>
+              <text x="164" y="58" text-anchor="middle" class="lbl-a">estimator</text>
+              <text x="164" y="72" text-anchor="middle" class="lbl">value ± σ</text>
+            </g>
+            <g>
+              <rect x="234" y="40" width="70" height="40" rx="7" class="s-muted" fill="none" stroke-width="1.3"/>
+              <text x="269" y="58" text-anchor="middle" class="lbl">store</text>
+              <text x="269" y="72" text-anchor="middle" class="lbl">by hash</text>
+            </g>
+            <g>
+              <rect x="328" y="40" width="86" height="40" rx="7" class="s-teal" fill="none" stroke-width="1.3"/>
+              <text x="371" y="58" text-anchor="middle" class="lbl-t">surrogate</text>
+              <text x="371" y="72" text-anchor="middle" class="lbl">GP fit</text>
+            </g>
+            <g>
+              <rect x="438" y="40" width="74" height="40" rx="7" class="s-teal" fill="none" stroke-width="1.3"/>
+              <text x="475" y="58" text-anchor="middle" class="lbl-t">decision</text>
+              <text x="475" y="72" text-anchor="middle" class="lbl">acquire</text>
+            </g>
+            <!-- forward arrows -->
+            <line x1="94"  y1="60" x2="116" y2="60" class="s-muted" stroke-width="1.2" marker-end="url(#ar)"/>
+            <line x1="210" y1="60" x2="232" y2="60" class="s-muted" stroke-width="1.2" marker-end="url(#ar)"/>
+            <line x1="304" y1="60" x2="326" y2="60" class="s-muted" stroke-width="1.2" marker-end="url(#ar)"/>
+            <line x1="414" y1="60" x2="436" y2="60" class="s-muted" stroke-width="1.2" marker-end="url(#ar)"/>
+            <!-- feedback arrow -->
+            <path d="M475 82 L475 128 L51 128 L51 82" class="s-muted" fill="none" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+            <text x="263" y="122" text-anchor="middle" class="lbl">next (T*, ρ*, run length)</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>Fig 4 — The loop.</b> <span style="color:var(--amber)">Amber</span> is the physical
+      thread (simulate, estimate); <span style="color:var(--teal)">teal</span> is the statistical thread
+      (model, decide). The store, keyed by a content hash of the run configuration, is what makes the
+      whole campaign resumable and never recomputed.</figcaption>
+    </figure>
+
+    <div class="kicker">The payoff is falsifiable, because the JZG reference makes the error real:
+    active learning reaches a target integrated error in <b>≈ 40 simulations</b> where a space-filling
+    design needs <b>≈ 120</b>. With ground truth on hand, that ratio is a <b>measurement</b>, not a hope —
+    and the same machinery, with the oracle swapped, carries forward to free-energy surfaces and beyond.</div>
+  </section>
+
+  <hr>
+  <p class="note" style="font-family:var(--mono);font-size:.74rem;margin-top:1.4rem">
+    Stage 1 · supercritical Lennard-Jones · estimator layer built &amp; validated against synthetic
+    AR(1) ground truth · surrogate + acquisitions next.
+  </p>
+
+</article>
+</div>
+
+<script>
+(function(){
+  // deterministic PRNG (no Math.random -> stable across renders)
+  function rng(seed){ let s = seed>>>0; return function(){ s = (s*1664525 + 1013904223)>>>0; return s/4294967296; }; }
+  function gauss(u){ return u()+u()+u()+u()-2; } // ~N(0, 2/3), cheap & smooth
+
+  const SVGNS="http://www.w3.org/2000/svg";
+  function el(name, attrs){ const e=document.createElementNS(SVGNS,name); for(const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function txt(x,y,cls,s,anchor){ const t=el("text",{x:x,y:y,class:cls}); if(anchor) t.setAttribute("text-anchor",anchor); t.textContent=s; return t; }
+
+  /* ---------- Fig 2 : correlated trajectory -> honest estimate ---------- */
+  (function(){
+    const svg=document.getElementById("fig-traj"); if(!svg) return;
+    const W=520,H=250, ml=40,mr=150,mt=22,mb=34, iw=W-ml-mr, ih=H-mt-mb;
+    const u=rng(7), M=120, t0=30, phi=0.8;
+    const ys=[]; let x=2.2;
+    for(let i=0;i<M;i++){
+      x = phi*x + 0.9*gauss(u);
+      const trans = i<t0 ? 2.6*Math.exp(-i/9) : 0;
+      ys.push(trans + 0.42*x);
+    }
+    let lo=Math.min.apply(null,ys), hi=Math.max.apply(null,ys); const pad=(hi-lo)*0.12; lo-=pad; hi+=pad;
+    const X=i=> ml + iw*i/(M-1);
+    const Y=v=> mt + ih*(1-(v-lo)/(hi-lo));
+    const prod=ys.slice(t0), mean=prod.reduce((a,b)=>a+b,0)/prod.length;
+    const sd=Math.sqrt(prod.reduce((a,b)=>a+(b-mean)*(b-mean),0)/prod.length);
+
+    // axes
+    svg.appendChild(el("line",{x1:ml,y1:mt+ih,x2:ml+iw,y2:mt+ih,class:"s-hair","stroke-width":1}));
+    svg.appendChild(el("line",{x1:ml,y1:mt,x2:ml,y2:mt+ih,class:"s-hair","stroke-width":1}));
+    // transient shading
+    svg.appendChild(el("rect",{x:ml,y:mt,width:X(t0)-ml,height:ih,class:"f-muted",opacity:0.09}));
+    // production ±sd band
+    svg.appendChild(el("rect",{x:X(t0),y:Y(mean+sd),width:ml+iw-X(t0),height:Y(mean-sd)-Y(mean+sd),class:"f-amber",opacity:0.12}));
+    // mean line
+    svg.appendChild(el("line",{x1:X(t0),y1:Y(mean),x2:ml+iw,y2:Y(mean),class:"s-amber","stroke-width":1.3,"stroke-dasharray":"5 4"}));
+    // series polyline
+    let d = ys.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)).join(" ");
+    svg.appendChild(el("path",{d:d,class:"s-ink",fill:"none","stroke-width":1.2,opacity:0.85}));
+    // t0 marker
+    svg.appendChild(el("line",{x1:X(t0),y1:mt-4,x2:X(t0),y2:mt+ih,class:"s-muted","stroke-width":1,"stroke-dasharray":"3 3"}));
+    svg.appendChild(txt(X(t0)+4, mt+8, "lbl", "t₀  equilibration"));
+    // axis labels
+    svg.appendChild(txt(ml, mt+ih+22, "lbl", "MD time →"));
+    svg.appendChild(txt(ml-6, mt+8, "lbl-i", "A")); // observable
+    // right-hand result
+    const rx=ml+iw+34, ry=Y(mean);
+    svg.appendChild(txt(rx-8, mt+ih*0.5-40, "lbl", "reduce →"));
+    svg.appendChild(el("line",{x1:rx,y1:ry-24,x2:rx,y2:ry+24,class:"s-amber","stroke-width":1.4}));
+    svg.appendChild(el("line",{x1:rx-5,y1:ry-24,x2:rx+5,y2:ry-24,class:"s-amber","stroke-width":1.4}));
+    svg.appendChild(el("line",{x1:rx-5,y1:ry+24,x2:rx+5,y2:ry+24,class:"s-amber","stroke-width":1.4}));
+    svg.appendChild(el("circle",{cx:rx,cy:ry,r:3.4,class:"f-amber"}));
+    svg.appendChild(txt(rx+12, ry-6, "lbl-i", "P*"));
+    svg.appendChild(txt(rx+12, ry+10, "lbl-a", "⟨A⟩ ± σ/√Nₑₓ"));
+    svg.appendChild(txt(rx-2, ry+46, "lbl", "Nₑₓ = M/g"));
+  })();
+
+  /* ---------- Fig 3 : heteroscedastic GP, total vs epistemic ---------- */
+  (function(){
+    const svg=document.getElementById("fig-gp"); if(!svg) return;
+    const W=520,H=300, ml=44,mr=18,mt=24,mb=40, iw=W-ml-mr, ih=H-mt-mb;
+    const x0=1.35, x1=3.0;
+    const f = x => 0.35 + 0.62*(x-1.2) - 0.045*(x-1.2)*(x-1.2);           // true surface
+    const noise = x => 0.055 + 0.5*Math.exp(-Math.pow((x-1.42)/0.42,2));   // aleatoric: big near criticality
+    const data = [1.42,1.58,1.80,2.02,2.66,2.90];                          // note the gap 2.02..2.66
+    const dmin = x => Math.min.apply(null, data.map(d=>Math.abs(d-x)));
+    const epi = x => 0.30*(1-Math.exp(-Math.pow(dmin(x)/0.30,2)));         // epistemic: big in the gap
+    const X = x => ml + iw*(x-x0)/(x1-x0);
+    const ylo=-0.05, yhi=1.75;
+    const Y = v => mt + ih*(1-(v-ylo)/(yhi-ylo));
+
+    // sample the curves
+    const N=120, xs=[]; for(let i=0;i<N;i++) xs.push(x0+(x1-x0)*i/(N-1));
+    function band(width){ // returns polygon points for mean ± width(x)
+      let up="", dn="";
+      xs.forEach(x=>{ up+= X(x).toFixed(1)+" "+Y(f(x)+width(x)).toFixed(1)+" "; });
+      for(let i=N-1;i>=0;i--){ const x=xs[i]; dn+= X(x).toFixed(1)+" "+Y(f(x)-width(x)).toFixed(1)+" "; }
+      return up+dn;
+    }
+    const tot = x => Math.sqrt(epi(x)*epi(x) + noise(x)*noise(x));
+
+    // axes
+    svg.appendChild(el("line",{x1:ml,y1:mt+ih,x2:ml+iw,y2:mt+ih,class:"s-hair","stroke-width":1}));
+    svg.appendChild(el("line",{x1:ml,y1:mt,x2:ml,y2:mt+ih,class:"s-hair","stroke-width":1}));
+    // bands (total behind, epistemic in front)
+    svg.appendChild(el("polygon",{points:band(tot),class:"f-amber",opacity:0.16}));
+    svg.appendChild(el("polygon",{points:band(epi),class:"f-teal",opacity:0.30}));
+    // true / mean line
+    let d = xs.map((x,i)=>(i?"L":"M")+X(x).toFixed(1)+" "+Y(f(x)).toFixed(1)).join(" ");
+    svg.appendChild(el("path",{d:d,class:"s-amber",fill:"none","stroke-width":1.6}));
+    // data points with heteroscedastic error bars
+    const u=rng(19);
+    data.forEach(x=>{
+      const yv=f(x)+ (gauss(u))*noise(x)*0.5;
+      const e=noise(x);
+      svg.appendChild(el("line",{x1:X(x),y1:Y(yv-e),x2:X(x),y2:Y(yv+e),class:"s-muted","stroke-width":1.3}));
+      svg.appendChild(el("line",{x1:X(x)-4,y1:Y(yv+e),x2:X(x)+4,y2:Y(yv+e),class:"s-muted","stroke-width":1.3}));
+      svg.appendChild(el("line",{x1:X(x)-4,y1:Y(yv-e),x2:X(x)+4,y2:Y(yv-e),class:"s-muted","stroke-width":1.3}));
+      svg.appendChild(el("circle",{cx:X(x),cy:Y(yv),r:3.6,class:"f-ink"}));
+    });
+    // axis labels
+    svg.appendChild(txt(ml+iw, mt+ih+24, "lbl-i", "T*", "end"));
+    svg.appendChild(txt(ml+iw, mt+ih+24, "lbl", ""));
+    svg.appendChild(txt(ml-8, mt+6, "lbl-i", "P*"));
+    svg.appendChild(txt(ml, mt+ih+24, "lbl", "1.35"));
+    svg.appendChild(txt(ml+iw-26, mt+ih+24, "lbl", "3.0"));
+
+    // annotations
+    // noise trap (left)
+    const ax=X(1.5);
+    svg.appendChild(el("line",{x1:ax,y1:Y(f(1.5)+tot(1.5))-6,x2:ax-6,y2:Y(f(1.5)+tot(1.5))-34,class:"s-amber","stroke-width":1}));
+    svg.appendChild(txt(ax-58, Y(f(1.5)+tot(1.5))-38, "lbl-a", "naïve parks here"));
+    svg.appendChild(txt(ax-58, Y(f(1.5)+tot(1.5))-26, "lbl", "(irreducible noise)"));
+    // epistemic gap (right)
+    const gx=X(2.34);
+    svg.appendChild(el("line",{x1:gx,y1:Y(f(2.34))-14,x2:gx+4,y2:Y(f(2.34))-44,class:"s-teal","stroke-width":1}));
+    svg.appendChild(txt(gx-30, Y(f(2.34))-48, "lbl-t", "epistemic wants a"));
+    svg.appendChild(txt(gx-30, Y(f(2.34))-36, "lbl-t", "point in this gap"));
+  })();
+})();
+</script>

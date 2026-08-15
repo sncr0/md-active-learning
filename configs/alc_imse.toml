@@ -1,0 +1,28 @@
+# Fix 2: acquire on integrated variance reduction, ALC/IMSE (§3.6.4).
+# Expected winner of the acquisition comparison.
+name = "alc_imse"
+observable = "pressure"
+seed = 0
+
+[domain]
+temperature = [1.35, 3.0]
+density = [0.05, 0.9]
+
+[acquisition]
+strategy = "alc_imse"
+
+[budget]
+n_initial = 12
+n_total = 120
+batch = 8
+
+[run_defaults]
+n_particles = 864
+n_steps = 100000
+equil_steps = 20000
+sample_interval = 100
+timestep = 0.005
+thermostat = "langevin"
+friction = 1.0
+cutoff = 2.5
+tail_correction = true
