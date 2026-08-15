@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active Learning over a Molecular-Dynamics Oracle</title>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] },
+    options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+  };
+</script>
+<script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script defer src="figdata.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f7f8f9; --ink:#1a1c1f; --muted:#5f6772; --faint:#8b939d;
+    --hair:#e4e7ea; --hair-strong:#d0d5da; --accent:#14607a;
+    --serif:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,"Times New Roman",serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:18px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:0 24px 7rem}
+  /* header */
+  header{max-width:760px;margin:0 auto;padding:4.5rem 24px 1.6rem}
+  .kicker{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 1rem}
+  h1{font-size:clamp(1.9rem,4.6vw,2.6rem);line-height:1.12;font-weight:600;letter-spacing:-.01em;margin:0 0 .6rem;text-wrap:balance}
+  .sub{font-size:1.12rem;color:var(--muted);margin:0 0 1.3rem;text-wrap:pretty}
+  .byline{font-family:var(--mono);font-size:.78rem;color:var(--faint);display:flex;flex-wrap:wrap;gap:.3rem 1.3rem;border-top:1px solid var(--hair);padding-top:1rem}
+  .byline b{color:var(--ink);font-weight:600}
+  .byline a{color:var(--accent);text-decoration:none}
+  /* abstract */
+  .abstract{background:var(--panel);border:1px solid var(--hair);border-radius:10px;padding:1.2rem 1.3rem;margin:2rem 0 0;font-size:1rem;color:#2c3138}
+  .abstract b{color:var(--ink)}
+  /* toc */
+  nav.toc{margin:1.8rem 0 0;font-size:.92rem}
+  nav.toc ol{margin:0;padding-left:1.2rem;color:var(--muted);columns:2;column-gap:2rem}
+  nav.toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid transparent}
+  nav.toc a:hover{border-bottom-color:var(--accent)}
+  /* sections */
+  section{margin-top:3rem}
+  h2{font-size:1.32rem;font-weight:600;margin:0 0 .9rem;letter-spacing:-.01em;padding-bottom:.35rem;border-bottom:1px solid var(--hair);display:flex;align-items:baseline;gap:.6rem;text-wrap:balance}
+  h2 .num{font-family:var(--mono);font-size:.82rem;color:var(--accent);font-weight:500}
+  h3{font-size:1.02rem;font-weight:600;margin:1.6rem 0 .5rem;color:#2b3037}
+  p{margin:0 0 1rem;text-wrap:pretty}
+  strong{font-weight:600}
+  a{color:var(--accent)}
+  code,.mono{font-family:var(--mono);font-size:.85em}
+  em{font-style:italic}
+  /* nomenclature */
+  .nom{display:grid;grid-template-columns:1fr 1fr;gap:0 2rem}
+  @media(max-width:620px){.nom{grid-template-columns:1fr}}
+  .nom table{width:100%;border-collapse:collapse;font-size:.9rem}
+  .nom td{padding:.28rem .3rem;border-bottom:1px solid var(--hair);vertical-align:top}
+  .nom td:first-child{white-space:nowrap;color:var(--ink);font-family:var(--mono);font-size:.82rem;width:5.5rem}
+  .nom td:last-child{color:var(--muted)}
+  .nom h3{margin:.4rem 0 .3rem}
+  /* figures */
+  figure{margin:1.8rem 0;padding:0}
+  .plot{width:100%}
+  .plot-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:620px){.plot-pair{grid-template-columns:1fr}}
+  figcaption{font-size:.86rem;color:var(--muted);margin-top:.6rem;line-height:1.5}
+  figcaption b{color:var(--ink);font-weight:600}
+  /* findings */
+  .finds{list-style:none;margin:1.2rem 0;padding:0;display:grid;gap:1px;background:var(--hair);border:1px solid var(--hair);border-radius:9px;overflow:hidden}
+  .finds li{background:var(--bg);padding:.85rem 1rem}
+  .finds .tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.03em;text-transform:uppercase;font-weight:600;display:inline-block;margin-bottom:.15rem}
+  .finds p{margin:0;font-size:.95rem;color:#33383f}
+  /* table */
+  .tablewrap{overflow-x:auto;margin:1.1rem 0}
+  table.data{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+  table.data th,table.data td{text-align:right;padding:.38rem .6rem;border-bottom:1px solid var(--hair)}
+  table.data th:first-child,table.data td:first-child{text-align:left}
+  table.data thead th{font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600}
+  .best{color:#136b45;font-weight:600}
+  .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:.35em;vertical-align:baseline}
+  .note{border-left:2px solid var(--accent);padding-left:.9rem;margin:1.3rem 0;color:var(--muted);font-size:.98rem}
+  .note b{color:var(--ink)}
+  mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  hr{border:0;border-top:1px solid var(--hair);margin:2.6rem 0 0}
+  footer{font-family:var(--mono);font-size:.74rem;color:var(--faint);margin-top:1.3rem;line-height:1.7}
+  footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+
+<header>
+  <p class="kicker">Molecular Dynamics × Active Learning</p>
+  <h1>Active learning over a molecular-dynamics oracle</h1>
+  <p class="sub">Learning a Lennard-Jones equation of state at the fewest simulations — by using calibrated uncertainty to decide what to run next, and how long to run it.</p>
+  <div class="byline">
+    <span><b>Samuel Moerman</b></span>
+    <span>August 2026</span>
+    <span><a href="https://github.com/sncr0/md-active-learning">github.com/sncr0/md-active-learning</a></span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <p class="abstract"><b>Abstract.</b> A molecular-dynamics (MD) simulator is an expensive, noisy oracle whose noise can be paid down by running longer. This project treats the choice of which thermodynamic states to simulate — and for how long — as sequential experimental design, scored against an analytic equation of state so that error is measurable everywhere. On a supercritical Lennard-Jones fluid the naive variance-seeking rule fails exactly as predicted; a decision-theoretic rule is the most accurate and the most reliable; and a cost-aware policy spends long, precise runs only on the few states that need them.</p>
+
+  <nav class="toc" aria-label="Contents">
+    <ol>
+      <li><a href="#nomenclature">Nomenclature</a></li>
+      <li><a href="#background">Background</a></li>
+      <li><a href="#system">The system</a></li>
+      <li><a href="#noise">Noise and the estimator</a></li>
+      <li><a href="#method">Surrogate and acquisition</a></li>
+      <li><a href="#stage1">Results — acquisition</a></li>
+      <li><a href="#stage2">Results — cost-aware</a></li>
+      <li><a href="#discussion">Discussion</a></li>
+    </ol>
+  </nav>
+
+  <!-- NOMENCLATURE -->
+  <section id="nomenclature">
+    <h2><span class="num">—</span> Nomenclature</h2>
+    <div class="nom">
+      <div>
+        <h3>Symbols (reduced units)</h3>
+        <table>
+          <tr><td>\(T^*,\ \rho^*\)</td><td>reduced temperature and number density, the two inputs</td></tr>
+          <tr><td>\(P^*,\ U^*\)</td><td>reduced pressure and potential energy per particle</td></tr>
+          <tr><td>\(\sigma,\varepsilon,m\)</td><td>LJ length, energy, mass scales (all set to 1)</td></tr>
+          <tr><td>\(r\)</td><td>pair separation</td></tr>
+          <tr><td>\(N,\ V\)</td><td>particle count (864) and box volume</td></tr>
+          <tr><td>\(\ell\)</td><td>production length of a run (steps) — a decision variable in Stage 2</td></tr>
+          <tr><td>\(M,\ N_\text{eff}\)</td><td>recorded frames; effective (independent) samples</td></tr>
+          <tr><td>\(g\)</td><td>statistical inefficiency, \(N_\text{eff}=M/g\)</td></tr>
+          <tr><td>\(\sigma_n^2(\mathbf x)\)</td><td>observation-noise variance (aleatoric)</td></tr>
+          <tr><td>\(s_\text{epi},s_\text{tot}\)</td><td>epistemic and total predictive std of the surrogate</td></tr>
+          <tr><td>\(K(\mathbf x)\)</td><td>noise coefficient, \(\sigma_n^2=K/\ell\)</td></tr>
+        </table>
+      </div>
+      <div>
+        <h3>Abbreviations</h3>
+        <table>
+          <tr><td>MD</td><td>molecular dynamics</td></tr>
+          <tr><td>LJ</td><td>Lennard-Jones (the pair potential)</td></tr>
+          <tr><td>NVT</td><td>fixed particles, volume, temperature ensemble</td></tr>
+          <tr><td>EOS</td><td>equation of state</td></tr>
+          <tr><td>KN</td><td>Kolafa–Nezbeda EOS (the analytic ground truth)</td></tr>
+          <tr><td>GP</td><td>Gaussian process (the surrogate)</td></tr>
+          <tr><td>LHS</td><td>Latin-hypercube (space-filling baseline)</td></tr>
+          <tr><td>ALC / IMSE</td><td>active-learning Cohn / integrated mean-square error</td></tr>
+          <tr><td>FCC</td><td>face-centred cubic (initial lattice)</td></tr>
+          <tr><td>PBC</td><td>periodic boundary conditions</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- BACKGROUND -->
+  <section id="background">
+    <h2><span class="num">1</span> Background</h2>
+    <p>An MD simulator answers a physical question by integrating Newton's equations for many particles. Treated as a data source it has three awkward properties.</p>
+    <p><strong>It is expensive.</strong> Each query costs seconds to hours, so the input space cannot be swept densely.</p>
+    <p><strong>It is noisy, and unevenly so.</strong> Every observable is a finite-time average of a fluctuating, correlated signal. The size of that noise varies by more than an order of magnitude across the input domain.</p>
+    <p><strong>The noise is a control variable.</strong> Run longer and it shrinks as \(1/\sqrt{N_\text{eff}}\). So <em>how precisely</em> to measure a point is a decision, weighed against compute — not a fixed property of the point.</p>
+    <p>The last two together are the whole problem: an oracle where you choose both <em>where</em> to query and <em>how precisely</em>. That is experimental design, not curve fitting.</p>
+  </section>
+
+  <!-- SYSTEM -->
+  <section id="system">
+    <h2><span class="num">2</span> The system</h2>
+
+    <h3>2.1 Interaction</h3>
+    <p>A single-site Lennard-Jones fluid: structureless particles in a periodic box, interacting only through one pair potential,</p>
+    \[ U(r) = 4\varepsilon\left[\left(\tfrac{\sigma}{r}\right)^{12} - \left(\tfrac{\sigma}{r}\right)^{6}\right]. \]
+    <p>The \(r^{-12}\) term is repulsion, the \(r^{-6}\) term attraction; the well sits at \(r=2^{1/6}\sigma\) with depth \(\varepsilon\). The potential is truncated at \(2.5\sigma\), with analytic long-range corrections applied to both energy and pressure.</p>
+    <figure>
+      <div id="fig-lj" class="plot"></div>
+      <figcaption><b>Fig 1. The pair potential.</b> Everything the model knows about matter is this curve. Marked: the minimum \((2^{1/6}\sigma,\,-\varepsilon)\) and the \(2.5\sigma\) cutoff.</figcaption>
+    </figure>
+
+    <h3>2.2 Units and ensemble</h3>
+    <p>Reduced units set \(\sigma=\varepsilon=m=1\), so the entire phase diagram collapses onto two dimensionless knobs: temperature \(T^*\) and density \(\rho^*=N\sigma^3/V\). We hold \(N=864\), \(V\), and \(T^*\) fixed — the <strong>NVT</strong> ensemble — with a Langevin thermostat coupling the system to the target temperature. The cubic box has side \(L=(N/\rho^*)^{1/3}\sigma\) and wraps under periodic boundaries; particles start on an FCC lattice and melt.</p>
+    <figure>
+      <div id="fig-snap" class="plot"></div>
+      <figcaption><b>Fig 2. A thermalized configuration.</b> A slab through the box after equilibration at \(\rho^*=0.6\); the circle is one particle's \(2.5\sigma\) interaction range. The box edges wrap onto each other.</figcaption>
+    </figure>
+
+    <h3>2.3 Observables</h3>
+    <p>The pressure follows from the virial — the ideal-gas term plus the average of every pair force projected onto its separation,</p>
+    \[ P = \rho\,k_B T + \frac{1}{3V}\Big\langle \sum_{i&lt;j}\mathbf r_{ij}\cdot\mathbf f_{ij}\Big\rangle. \]
+    <p>Potential energy per particle \(U^*\) comes from the same trajectory; self-diffusion \(D^*\) is a later, harder estimator built on a mean-squared-displacement fit.</p>
+
+    <h3>2.4 The target</h3>
+    <p>For each observable we want the <em>response surface</em> over the \((T^*,\rho^*)\) plane. The reason to start with a Lennard-Jones fluid is that this surface is known analytically — the Kolafa–Nezbeda equation of state, accurate to about a percent — so the surrogate's error can be evaluated everywhere on a dense grid rather than on a small held-out set.</p>
+    <figure>
+      <div id="fig-surface" class="plot" style="height:400px"></div>
+      <figcaption><b>Fig 3. What we are learning.</b> The reduced-pressure surface \(P^*(T^*,\rho^*)\) from the KN equation of state, as filled contours. Smooth, but steep at high density — where, as it turns out, the noise is also largest.</figcaption>
+    </figure>
+    <p class="note">One restriction: below the critical temperature \((T^*_c\approx1.31)\) an NVT box phase-separates and pressure stops being a smooth function of the inputs. We stay supercritical, \(T^*\ge1.35\), which keeps the hard near-critical curvature and drops the ill-posed region.</p>
+  </section>
+
+  <!-- NOISE -->
+  <section id="noise">
+    <h2><span class="num">3</span> Noise and the estimator</h2>
+
+    <h3>3.1 A run is a finite, correlated sample</h3>
+    <p>A simulation produces a trajectory; an observable is a time average that, by ergodicity, estimates the ensemble average,</p>
+    \[ \langle A\rangle \approx \bar A = \frac1M\sum_{i=1}^{M} A(t_i). \]
+    <p>Two facts make the obvious error bar wrong. First, the opening transient is not drawn from equilibrium and must be discarded at a detected cutoff. Second, consecutive frames are correlated, so \(M\) frames are worth far fewer than \(M\) independent samples.</p>
+    <figure>
+      <div class="plot-pair"><div id="fig-tq"></div><div id="fig-tn"></div></div>
+      <figcaption><b>Fig 4. Two trajectories, same temperature.</b> Reduced pressure versus reduced time at \(\rho^*=0.15\) (left) and \(\rho^*=0.85\) (right); dashed line = detected equilibration, solid line = production mean. The dense fluid's mean carries \(15\times\) the standard error of the dilute one — the noise is <em>heteroscedastic</em>.</figcaption>
+    </figure>
+
+    <h3>3.2 An honest error bar</h3>
+    <p>The variance of the mean is inflated by the statistical inefficiency \(g\):</p>
+    \[ \operatorname{Var}(\bar A)=\frac{\sigma_A^2}{N_\text{eff}},\qquad N_\text{eff}=\frac{M}{g},\qquad g = 1 + 2\sum_{k\ge1}\rho(k), \]
+    <p>where \(\rho(k)\) is the autocorrelation at lag \(k\). Typically \(g\approx5\text{–}50\); reporting \(\sigma_A/\sqrt{M}\) instead makes the error bar 2–7\(\times\) too small. That number feeds the decision layer directly, so a wrong \(\sigma\) here corrupts everything downstream silently. The estimator was therefore built and validated first, against synthetic series of known \(g\).</p>
+
+    <h3>3.3 Heteroscedasticity is the signal</h3>
+    <p>The fluctuation size \(\sigma_A\) is itself a strong function of state — small in the dilute gas, large in the dense liquid (Fig 4). The surrogate must accept a <em>per-point</em> noise variance; a model with one global noise level would average away exactly the structure that makes the problem interesting.</p>
+  </section>
+
+  <!-- METHOD -->
+  <section id="method">
+    <h2><span class="num">4</span> Surrogate and acquisition</h2>
+
+    <h3>4.1 Three layers</h3>
+    <p>The code is three layers with narrow interfaces. The <strong>oracle</strong> maps a run configuration to a trajectory; the <strong>estimator</strong> maps a trajectory to an observable with honest uncertainty; the <strong>decision</strong> layer maps all observations so far to the next query. The surrogate never touches trajectory data — only estimated values and their variances.</p>
+
+    <h3>4.2 The surrogate</h3>
+    <p>Each observable is modelled with a Gaussian process. Each datum is a noisy observation of a latent surface,</p>
+    \[ y_i = f(\mathbf x_i) + \varepsilon_i,\qquad \varepsilon_i\sim\mathcal N\!\big(0,\ \sigma_n^2(\mathbf x_i)\big). \]
+    <p>The per-point noise enters as the GP's diagonal (not as a kernel term), which keeps it out of the latent posterior. The predictive variance then splits cleanly,</p>
+    \[ \underbrace{s_\text{tot}^2(\mathbf x)}_{\text{total}} = \underbrace{s_\text{epi}^2(\mathbf x)}_{\text{reducible}} + \underbrace{\sigma_n^2(\mathbf x)}_{\text{irreducible}}. \]
+    <p>Epistemic variance shrinks with more data and vanishes at an observed point; aleatoric variance is the measurement noise at the chosen run length, and only a longer run shrinks it. Keeping the two apart is the whole game.</p>
+
+    <h3>4.3 Four ways to choose the next point</h3>
+    <ul class="finds">
+      <li><span class="tag" style="color:#0072B2">Latin hypercube</span><p>A space-filling design that ignores the surrogate — the honest, non-adaptive baseline.</p></li>
+      <li><span class="tag" style="color:#D55E00">Max variance</span><p>\(a(\mathbf x)=s_\text{tot}^2\). Goes where predictive variance is largest — which, under heteroscedastic noise, is wherever the <em>noise</em> is largest. Expected to fail.</p></li>
+      <li><span class="tag" style="color:#009E73">Epistemic</span><p>\(a(\mathbf x)=s_\text{epi}^2\). Goes where the <em>function</em> is least known, ignoring irreducible noise.</p></li>
+      <li><span class="tag" style="color:#CC79A7">ALC / IMSE</span><p>Scores a candidate by how much observing it would reduce integrated variance <em>everywhere</em>, not by how uncertain it is itself — a decision-theoretic criterion.</p></li>
+    </ul>
+
+    <h3>4.4 Protocol</h3>
+    <p>Domain \(T^*\in[1.35,3.0]\), \(\rho^*\in[0.05,0.9]\). Each strategy runs from a shared 8-point design; the score is the integrated absolute error against KN over a dense grid, \(\int|f_\text{GP}-P^*_\text{KN}|\), averaged over three seeds.</p>
+  </section>
+
+  <!-- STAGE 1 -->
+  <section id="stage1">
+    <h2><span class="num">5</span> Results — which acquisition learns fastest</h2>
+    <figure>
+      <div id="fig-acq" class="plot" style="height:400px"></div>
+      <figcaption><b>Fig 5. Error versus simulations</b> (log scale; mean of 3 seeds, bands = ±1 std). All start from the same 8-point design (error ≈ 0.43, off-scale left). Lower is better; true pressure spans ~0.1–10.</figcaption>
+    </figure>
+    <ul class="finds">
+      <li><span class="tag" style="color:#D55E00">Max variance — the trap, confirmed</span><p>Worst at the end and <em>stops improving</em> past ~32 runs: it resamples the noisiest region, where total variance is dominated by irreducible noise that never shrinks. Reproduced across all three seeds.</p></li>
+      <li><span class="tag" style="color:#0072B2">Latin hypercube — a real baseline</span><p>Best at small budgets. On a smooth 2-D surface a space-filling design is close to optimal; adaptivity has little to exploit early.</p></li>
+      <li><span class="tag" style="color:#CC79A7">ALC / IMSE — wins late, wins on consistency</span><p>Starts worst (it front-loads the low-noise, high-pressure corner), crosses over around 31 runs, and finishes lowest and with the tightest band by far — roughly 4\(\times\) more repeatable than LHS.</p></li>
+      <li><span class="tag" style="color:#009E73">Epistemic — quietly solid</span><p>Tracks LHS throughout and ends just behind ALC. Ignoring the noise term keeps it out of the trap.</p></li>
+    </ul>
+
+    <h3>5.1 Where the error lives</h3>
+    <p>The single number hides the geography. Almost all error is in the high-density, high-temperature corner, where pressure is steepest. A uniform design under-resolves it; ALC concentrates there.</p>
+    <figure>
+      <div class="plot-pair"><div id="fig-elhs"></div><div id="fig-ealc"></div></div>
+      <figcaption><b>Fig 6. Error maps</b> (surrogate − KN, shared colour scale; dots are the 48 runs). <b>Left:</b> Latin hypercube. <b>Right:</b> ALC/IMSE. The corner is the whole contest.</figcaption>
+    </figure>
+    <p class="note"><b>A floor everyone hits.</b> The 864-particle, cutoff simulations differ from the full-potential EOS by a small fixed amount (~0.008). Every strategy piles up against it, so the contest is how <em>fast</em> you reach the floor, not how far below it you go. This — not a bug — is why the active-learning margin here is real but modest.</p>
+  </section>
+
+  <!-- STAGE 2 -->
+  <section id="stage2">
+    <h2><span class="num">6</span> Results — spending a budget, not counting runs</h2>
+    <p>Stage 2 lets the policy choose each run's length \(\ell\) under a fixed compute budget. Longer runs cost more (\(c_0+c_1\ell\)) but return lower noise (\(\sigma_n^2=K(\mathbf x)/\ell\)). Maximizing variance-reduction-per-cost has a closed-form optimal length,</p>
+    \[ \ell^\star(\mathbf x)=\sqrt{\frac{K(\mathbf x)\,c_0}{s_\text{epi}^2(\mathbf x)\,c_1}} \, . \]
+    <p>Run longer where the noise \(K\) is large; shorter where the function is already uncertain, since a cheap noisy sample there already tells you most of what a precise one would.</p>
+    <figure>
+      <div id="fig-len" class="plot" style="height:420px"></div>
+      <figcaption><b>Fig 7. The measured policy.</b> Each run coloured by its chosen length. Short cheap runs blanket the smooth low-density region; long runs concentrate in the high-density band — precision spent where pressure is steep and fluctuations large.</figcaption>
+    </figure>
+    <p>Against a fixed-length baseline at equal budget, the cost-aware policy ran <strong>56 shorter simulations</strong> (mean ~3,300 steps, adaptively 1,500–7,900) versus <strong>48 at 5,000</strong>, for slightly lower error at slightly lower cost. Spatially it banked <strong>~2\(\times\) more production in the high-density corner</strong> than in the quiet majority. The answer to the open question — many cheap samples or few precise ones — is <em>both, placed deliberately</em>.</p>
+  </section>
+
+  <!-- DISCUSSION -->
+  <section id="discussion">
+    <h2><span class="num">7</span> Discussion</h2>
+    <p>The headline that did <em>not</em> appear is itself the result: on a smooth 2-D surface, against a strong space-filling baseline and a finite-size floor, active learning's margin is modest. What holds cleanly is sharper: the naive rule fails in a specific, predicted way, and the principled rule is both the most accurate and — the property that matters on a one-shot campaign — the most reliable.</p>
+    <p>The regimes where adaptivity should dominate are the ones this benchmark lacks, and they set the direction: higher input dimension, where space-filling degrades quickly; a localized target such as tracing the coexistence-dome boundary rather than fitting a smooth field; and simply a larger budget with longer runs, to separate the strategies before the finite-size floor. Cost-aware allocation (§6) is the first step into that territory — and its length map is the first sign the policy reasons about precision the way a person spending compute would.</p>
+  </section>
+
+  <hr>
+  <footer>
+    Method: single-site LJ fluid, reduced units, OpenMM Langevin NVT; virial pressure by box-scaling finite difference; autocorrelation-corrected errors via pymbar; heteroscedastic GP (scikit-learn); Kolafa–Nezbeda reference EOS. All runs on one laptop, seconds per simulation.<br>
+    Code, tests, and campaign drivers: <a href="https://github.com/sncr0/md-active-learning">github.com/sncr0/md-active-learning</a>
+  </footer>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  if(!window.Plotly || !window.FIGDATA){ return; }
+  var F = window.FIGDATA;
+  var CAT = {latin_hypercube:'#0072B2', max_variance:'#D55E00', epistemic:'#009E73', alc_imse:'#CC79A7'};
+  var NAME = {latin_hypercube:'latin hypercube', max_variance:'max variance', epistemic:'epistemic', alc_imse:'alc / imse'};
+  var INK='#1a1c1f', MUTED='#5f6772', HAIR='#e7eaec', LINE='#c9ced3';
+  var FONT={family:'Georgia, serif', size:12.5, color:INK};
+  var CFG={responsive:true, displayModeBar:false};
+  function axis(extra){ return Object.assign({gridcolor:HAIR, linecolor:LINE, zeroline:false, ticks:'outside', tickcolor:LINE, tickfont:{size:11}, automargin:true}, extra||{}); }
+  function base(extra){ return Object.assign({paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:FONT, showlegend:false, margin:{l:52,r:16,t:12,b:44}, hoverlabel:{font:{family:'Georgia, serif',size:12}}}, extra||{}); }
+
+  // Fig 1 — LJ potential
+  (function(){
+    var r=[], u=[]; for(var i=0;i<=220;i++){var x=0.95+(3.0-0.95)*i/220; r.push(x); u.push(4*(Math.pow(x,-12)-Math.pow(x,-6)));}
+    var line={x:r,y:u,mode:'lines',line:{color:'#14607a',width:2.2},hovertemplate:'r = %{x:.2f} σ<br>U = %{y:.2f} ε<extra></extra>'};
+    var minpt={x:[Math.pow(2,1/6)],y:[-1],mode:'markers+text',marker:{color:'#14607a',size:7},text:['min'],textposition:'bottom center',textfont:{size:10,color:MUTED},hoverinfo:'skip'};
+    var cut={x:[2.5,2.5],y:[-1.25,3],mode:'lines',line:{color:MUTED,width:1,dash:'dot'},hoverinfo:'skip'};
+    Plotly.newPlot('fig-lj',[line,minpt,cut],base({height:300,
+      xaxis:axis({title:{text:'separation r / σ',font:{size:12}},range:[0.9,3.02]}),
+      yaxis:axis({title:{text:'U / ε',font:{size:12}},range:[-1.25,3]}),
+      annotations:[{x:2.5,y:2.4,text:'cutoff 2.5σ',showarrow:false,font:{size:10,color:MUTED},xanchor:'left',xshift:4}]
+    }),CFG);
+  })();
+
+  // Fig 2 — snapshot
+  (function(){
+    var s=F.snapshot;
+    var pts={x:s.x,y:s.y,mode:'markers',marker:{color:'#3d6b7d',size:11,line:{color:'#fff',width:1}},hovertemplate:'x=%{x:.1f}  y=%{y:.1f}<extra></extra>'};
+    var t=[],cx=[],cy=[]; for(var i=0;i<=60;i++){var a=2*Math.PI*i/60; cx.push(s.cx+s.cutoff*Math.cos(a)); cy.push(s.cy+s.cutoff*Math.sin(a));}
+    var circ={x:cx,y:cy,mode:'lines',line:{color:'#c0552a',width:1.5,dash:'dash'},hoverinfo:'skip'};
+    var cpt={x:[s.cx],y:[s.cy],mode:'markers',marker:{color:'#c0552a',size:12,line:{color:'#fff',width:1}},hoverinfo:'skip'};
+    Plotly.newPlot('fig-snap',[pts,circ,cpt],base({height:360,
+      xaxis:axis({range:[0,s.L],title:{text:'x / σ',font:{size:12}},constrain:'domain'}),
+      yaxis:axis({range:[0,s.L],title:{text:'y / σ',font:{size:12}},scaleanchor:'x',scaleratio:1}),
+      shapes:[{type:'rect',x0:0,y0:0,x1:s.L,y1:s.L,line:{color:LINE,width:1.2}}]
+    }),CFG);
+  })();
+
+  // Fig 3 — KN response surface (2D filled contour; no WebGL dependency)
+  (function(){
+    Plotly.newPlot('fig-surface',[{type:'contour',x:F.kn.T,y:F.kn.rho,z:F.kn.P,colorscale:'Viridis',
+      colorbar:{title:{text:'P*',side:'right'},thickness:12,len:.85,tickfont:{size:10}},
+      contours:{coloring:'heatmap',showlabels:true,labelfont:{size:9,color:'rgba(255,255,255,.9)'}},
+      line:{width:.6,color:'rgba(255,255,255,.25)'},
+      hovertemplate:'T*=%{x:.2f}  ρ*=%{y:.2f}  P*=%{z:.2f}<extra></extra>'}],
+      base({height:400,
+        xaxis:axis({title:{text:'T*',font:{size:12}}}),
+        yaxis:axis({title:{text:'ρ*',font:{size:12}}})
+      }),CFG);
+  })();
+
+  // Fig 4 — trajectories
+  function traj(id,d,color){
+    var line={x:d.time,y:d.P,mode:'lines',line:{color:color,width:1},hovertemplate:'t=%{x:.0f}  P*=%{y:.3f}<extra></extra>'};
+    Plotly.newPlot(id,[line],base({height:230,
+      xaxis:axis({title:{text:'reduced time',font:{size:11}}}),
+      yaxis:axis({title:{text:'P*',font:{size:11}}}),
+      shapes:[
+        {type:'line',x0:d.t0_time,x1:d.t0_time,y0:0,y1:1,yref:'paper',line:{color:MUTED,width:1,dash:'dash'}},
+        {type:'line',x0:d.t0_time,x1:d.time[d.time.length-1],y0:d.mean,y1:d.mean,line:{color:'#c0552a',width:1.4}}
+      ],
+      annotations:[
+        {x:0,y:1,xref:'paper',yref:'paper',text:'ρ*='+d.rho+'  ·  σ(mean)='+d.sigma.toFixed(4),showarrow:false,font:{size:10,color:MUTED},xanchor:'left',yanchor:'top',bgcolor:'rgba(255,255,255,.7)'}
+      ]
+    }),CFG);
+  }
+  traj('fig-tq',F.traj_quiet,'#3d6b7d');
+  traj('fig-tn',F.traj_noisy,'#c0552a');
+
+  // Fig 5 — acquisition curves
+  (function(){
+    var ns=F.acq.ns.slice(1); // drop shared n=8
+    var traces=[];
+    ['latin_hypercube','max_variance','epistemic','alc_imse'].forEach(function(k){
+      var m=F.acq.series[k].mean.slice(1), sd=F.acq.series[k].std.slice(1);
+      var up=m.map(function(v,i){return v+sd[i];}), lo=m.map(function(v,i){return Math.max(v-sd[i],1e-4);});
+      var c=CAT[k];
+      traces.push({x:ns.concat(ns.slice().reverse()),y:up.concat(lo.slice().reverse()),fill:'toself',fillcolor:hexToRgba(c,0.12),line:{width:0},hoverinfo:'skip',showlegend:false,type:'scatter'});
+      traces.push({x:ns,y:m,mode:'lines+markers',name:NAME[k],line:{color:c,width:2},marker:{color:c,size:6},hovertemplate:NAME[k]+'<br>%{x} sims · %{y:.4f}<extra></extra>'});
+    });
+    Plotly.newPlot('fig-acq',traces,base({height:400,showlegend:true,legend:{x:1,xanchor:'right',y:1,font:{size:11},bgcolor:'rgba(255,255,255,.6)'},
+      xaxis:axis({title:{text:'number of simulations',font:{size:12}},dtick:8}),
+      yaxis:axis({title:{text:'∫ | surrogate − KN |',font:{size:12}},type:'log'})
+    }),CFG);
+  })();
+  // hex fills need rgba; convert
+  function hexToRgba(h,a){var n=parseInt(h.slice(1),16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
+
+  // Fig 6 — error maps (shared diverging scale)
+  (function(){
+    var m=0;[F.err_lhs,F.err_alc].forEach(function(E){E.err.forEach(function(row){row.forEach(function(v){m=Math.max(m,Math.abs(v));});});});
+    var scale=[[0,'#2166ac'],[0.5,'#f7f7f7'],[1,'#b2182b']];
+    function map(id,E,title){
+      var hm={type:'heatmap',x:E.T,y:E.rho,z:E.err,zmin:-m,zmax:m,colorscale:scale,
+        colorbar:{title:{text:'err',side:'right'},thickness:10,len:.8,tickfont:{size:9}},
+        hovertemplate:'T*=%{x:.2f} ρ*=%{y:.2f}<br>err=%{z:.3f}<extra></extra>'};
+      var sc={x:E.sx,y:E.sy,mode:'markers',marker:{color:'#111',size:4,line:{color:'#fff',width:.6}},hoverinfo:'skip'};
+      Plotly.newPlot(id,[hm,sc],base({height:280,margin:{l:44,r:10,t:22,b:38},
+        title:{text:title+'  (|err| '+E.mae.toFixed(4)+')',font:{size:12,color:INK},x:0,xanchor:'left',y:.98},
+        xaxis:axis({title:{text:'T*',font:{size:11}}}),
+        yaxis:axis({title:{text:'ρ*',font:{size:11}}})
+      }),CFG);
+    }
+    map('fig-elhs',F.err_lhs,'Latin hypercube');
+    map('fig-ealc',F.err_alc,'ALC / IMSE');
+  })();
+
+  // Fig 7 — length allocation
+  (function(){
+    var d=F.lengths;
+    Plotly.newPlot('fig-len',[{x:d.T,y:d.rho,mode:'markers',
+      marker:{color:d.length,colorscale:'Viridis',size:11,line:{color:'#fff',width:.6},
+        colorbar:{title:{text:'ℓ (steps)',side:'right'},thickness:12,len:.8,tickfont:{size:10}}},
+      hovertemplate:'T*=%{x:.2f} ρ*=%{y:.2f}<br>ℓ=%{marker.color:.0f} steps<extra></extra>'}],
+      base({height:420,
+        xaxis:axis({title:{text:'T*',font:{size:12}},range:[1.35,3.0]}),
+        yaxis:axis({title:{text:'ρ*',font:{size:12}},range:[0.05,0.9]})
+      }),CFG);
+  })();
+});
+</script>
+</body>
+</html>
