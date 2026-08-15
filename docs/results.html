@@ -300,24 +300,26 @@
   const tip=document.getElementById("tip");
   const ends=[];
   series.forEach(s=>{
-    const c=col(s.css);
+    const cv="var("+s.css+")";
     let d="";
     s.d.forEach((v,i)=>{ d+=(i?"L":"M")+X(ns[i]).toFixed(1)+" "+Y(v).toFixed(1)+" "; });
-    svg.appendChild(el("path",{d:d,fill:"none",stroke:c,"stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"}));
+    const path=el("path",{d:d,fill:"none","stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"});
+    path.style.stroke=cv; svg.appendChild(path);
     s.d.forEach((v,i)=>{
-      const m=el("circle",{cx:X(ns[i]),cy:Y(v),r:4.5,fill:c,stroke:col("--panel"),"stroke-width":1.5});
-      m.style.cursor="crosshair";
+      const m=el("circle",{cx:X(ns[i]),cy:Y(v),r:4.5,"stroke-width":1.5});
+      m.style.fill=cv; m.style.stroke="var(--panel)"; m.style.cursor="crosshair";
       m.addEventListener("mousemove",(e)=>{tip.style.opacity=1;tip.style.left=(e.clientX+12)+"px";tip.style.top=(e.clientY-10)+"px";tip.textContent=`${s.key} · n=${ns[i]} · ${v.toFixed(4)}`;});
       m.addEventListener("mouseleave",()=>{tip.style.opacity=0;});
       svg.appendChild(m);
     });
-    ends.push({name:s.key, color:c, y:Y(s.d[s.d.length-1])});
+    ends.push({name:s.key, css:s.css, y:Y(s.d[s.d.length-1])});
   });
   // decluttered direct end-labels
   ends.sort((a,b)=>a.y-b.y);
   for(let i=1;i<ends.length;i++){ if(ends[i].y-ends[i-1].y<15) ends[i].y=ends[i-1].y+15; }
   ends.forEach(e=>{
-    svg.appendChild(el("text",{x:ml+iw+8,y:e.y+3.5,class:"cx-end",fill:e.color}, e.name));
+    const t=el("text",{x:ml+iw+8,y:e.y+3.5,class:"cx-end"}, e.name);
+    t.style.fill="var("+e.css+")"; svg.appendChild(t);
   });
 })();
 </script>
