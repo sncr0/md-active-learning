@@ -1,6 +1,7 @@
 """End-to-end campaign: propose -> simulate (pool) -> estimate -> store -> refit.
 
-Skips without the `md` extra. Uses tiny runs so it stays fast.
+Skips without the `md` extra, or without a reachable Postgres. Uses tiny runs
+so it stays fast.
 """
 
 import numpy as np
@@ -10,7 +11,7 @@ pytest.importorskip("openmm")
 
 from mdal.campaign import CampaignSpec, run_campaign
 from mdal.domain import Domain
-from mdal.store import DuckDBStore
+from mdal.store import PostgresStore
 
 RUN_DEFAULTS = dict(n_particles=864, n_steps=1500, equil_steps=800, sample_interval=100)
 
@@ -22,8 +23,8 @@ def _spec(strategy):
     )
 
 
-def test_campaign_runs_end_to_end(tmp_path):
-    store = DuckDBStore(str(tmp_path / "c.duckdb"))
+def test_campaign_runs_end_to_end(campaign_id):
+    store = PostgresStore(campaign_id)
     run_campaign(_spec("epistemic"), store, max_workers=4)
 
     X, y, noise_var = store.observations_for("pressure")
@@ -35,11 +36,11 @@ def test_campaign_runs_end_to_end(tmp_path):
     store.close()
 
 
-def test_campaign_is_resumable(tmp_path):
-    db = str(tmp_path / "c.duckdb")
-    run_campaign(_spec("alc_imse"), DuckDBStore(db), max_workers=4)
-    # reopening and re-running recomputes nothing and does not exceed the budget
-    store = DuckDBStore(db)
+def test_campaign_is_resumable(campaign_id):
+    run_campaign(_spec("alc_imse"), PostgresStore(campaign_id), max_workers=4)
+    # reopening (same campaign_id) and re-running recomputes nothing and does
+    # not exceed the budget
+    store = PostgresStore(campaign_id)
     run_campaign(_spec("alc_imse"), store, max_workers=4)
     assert len(store.observations_for("pressure")[0]) == 8
     store.close()

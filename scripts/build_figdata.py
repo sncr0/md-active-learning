@@ -18,7 +18,7 @@ from mdal.domain import Domain
 from mdal.estimator import FrameAverageEstimator
 from mdal.oracle.lennard_jones import LennardJonesOracle, _make_context
 from mdal.reference import pressure
-from mdal.store import DuckDBStore
+from mdal.store import PostgresStore
 from mdal.surrogate import HeteroscedasticGP
 
 DOMAIN = Domain()
@@ -71,7 +71,7 @@ def acquisition_curves(ns=(8, 16, 24, 32, 40, 48), seeds=(0, 1, 2)):
     for strat in STRATEGIES:
         rows = []
         for s in seeds:
-            store = DuckDBStore(f"data/cmp_{strat}_s{s}.duckdb")
+            store = PostgresStore(f"cmp_{strat}_s{s}")
             rows.append([integrated_abs_error(store, DOMAIN, "pressure", n, 55) for n in ns])
             store.close()
         arr = np.array(rows)
@@ -80,7 +80,7 @@ def acquisition_curves(ns=(8, 16, 24, 32, 40, 48), seeds=(0, 1, 2)):
 
 
 def error_map(store_name, grid=52):
-    store = DuckDBStore(f"data/{store_name}.duckdb")
+    store = PostgresStore(store_name)
     X, y, nv = store.observations_for("pressure")
     store.close()
     gp = HeteroscedasticGP().fit(X, y, nv)
@@ -96,7 +96,7 @@ def error_map(store_name, grid=52):
 
 
 def length_map(store_name="cost_cost_aware_s0"):
-    store = DuckDBStore(f"data/{store_name}.duckdb")
+    store = PostgresStore(store_name)
     X = store.observations_for("pressure")[0]
     L = store.lengths_for("pressure")
     store.close()

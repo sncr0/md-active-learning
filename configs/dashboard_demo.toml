@@ -1,0 +1,28 @@
+# Small live campaign used to seed the DOE dashboard (scripts/build_doe_data.py)
+# with a genuinely in-progress campaign alongside the archived, complete ones.
+name = "dashboard_demo"
+observable = "pressure"
+seed = 7
+
+[domain]
+temperature = [1.35, 3.0]
+density = [0.05, 0.9]
+
+[acquisition]
+strategy = "alc_imse"
+
+[budget]
+n_initial = 8
+n_total = 64
+batch = 8
+
+[run_defaults]
+n_particles = 864
+n_steps = 25000
+equil_steps = 5000
+sample_interval = 100
+timestep = 0.005
+thermostat = "langevin"
+friction = 1.0
+cutoff = 2.5
+tail_correction = true

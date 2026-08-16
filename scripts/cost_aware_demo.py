@@ -20,7 +20,7 @@ from mdal.campaign import run_cost_aware_campaign
 from mdal.cost import LinearCost
 from mdal.decision.cost_aware import CostAwareALC, FixedLengthALC
 from mdal.domain import Domain
-from mdal.store import DuckDBStore
+from mdal.store import PostgresStore
 
 
 def main(budget: float = 340000, seed: int = 0, fixed_len: int = 5000):
@@ -39,12 +39,22 @@ def main(budget: float = 340000, seed: int = 0, fixed_len: int = 5000):
     }
     stores = {}
     for name, acq in acqs.items():
-        store = DuckDBStore(f"data/cost_{name}_s{seed}.duckdb")
+        store = PostgresStore(f"cost_{name}_s{seed}")
         t = time.perf_counter()
         run_cost_aware_campaign(
             domain, store, budget, run_defaults=run_defaults, acquisition=acq,
             cost=cost, n_initial=8, init_len=4000, batch=8, seed=seed,
             log_fn=lambda m: print("  ", m, flush=True),
+        )
+        # cost-aware campaigns are budget-driven, not count-driven, so n_total
+        # (which the dashboard uses for a progress bar) is only known after
+        # the fact — the run count actually achieved under the budget.
+        n_runs = len(store.observations_for("pressure")[0])
+        store.register_campaign(
+            name=f"cost_{name}_s{seed}", strategy=f"{name}_alc", observable="pressure",
+            seed=seed, domain={"temperature": [domain.lows[0], domain.highs[0]],
+                                "density": [domain.lows[1], domain.highs[1]]},
+            n_initial=8, n_total=n_runs, batch=8,
         )
         print(f"{name}: {time.perf_counter()-t:.0f}s", flush=True)
         stores[name] = store

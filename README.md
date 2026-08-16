@@ -190,18 +190,22 @@ src/mdal/
   surrogate/     heteroscedastic GP (scikit-learn)
   decision/      acquisition functions (Stage 1 + cost-aware)
   reference/     Kolafa-Nezbeda analytic EOS (ground truth)
-  store/         content-hash-keyed DuckDB store (resumable)
+  store/         content-hash-keyed Postgres store (resumable)
   executor/      single-writer process pool
   campaign/      the active-learning loops
   analysis/      error map + acquisition comparison
+  api/           read-only dashboard API, live queries (see below)
 tests/           unit + integration tests        scripts/   benchmark, campaign, and figure drivers
+dashboard/       React + Vite frontend for the campaign dashboard
+docker/          Postgres image (schema in docker/postgres/init.sql)
 ```
 
 ## Running
 
 ```bash
-uv sync --extra md --extra surrogate --extra viz   # openmm, scikit-learn, matplotlib
-uv run pytest                                       # full suite (some tests need the md extra)
+docker compose up -d db                             # postgres on :5432 (schema auto-applied)
+uv sync --extra md --extra surrogate --extra viz     # openmm, scikit-learn, matplotlib
+uv run pytest                                        # full suite (some tests need the md extra or postgres)
 
 uv run python scripts/benchmark_oracle.py           # per-sim cost + thread vs pool throughput
 uv run python scripts/compare_acquisitions.py       # Stage 1 acquisition comparison
@@ -211,4 +215,30 @@ uv run python scripts/build_readme_figures.py       # regenerate the static figu
 ```
 
 The estimator imports `pymbar`; the oracle imports `openmm` lazily, so the core package installs and
-imports without the `md` extra. All runs are on one laptop, seconds per simulation.
+imports without the `md` extra. Every campaign needs Postgres (`docker compose up -d db`); all runs
+are on one laptop, seconds per simulation.
+
+## Dashboard
+
+A live campaign dashboard — which simulations are done, which are still running, and what each one
+measured — backed by a small read-only API and a React frontend.
+
+```bash
+docker compose up -d db                                      # postgres, if not already running
+uv sync --extra api                                          # fastapi, uvicorn
+uv run python scripts/run_campaign.py configs/alc_imse.toml  # a live campaign, if you want one
+
+uv run python scripts/run_api.py                             # dashboard API on :8000
+cd dashboard && npm install && npm run dev                   # frontend on :5173 (proxies /api -> :8000)
+```
+
+**Why Postgres:** every campaign — not just the dashboard's — now lives in one shared database
+(`runs`/`observations` keyed by `(campaign_id, run_hash)`, plus a `campaigns` table for
+name/strategy/budget metadata). The dashboard API queries it directly, live, with no export step:
+Postgres's MVCC lets readers see a consistent view without blocking on, or being blocked by, a
+campaign that's actively writing. That's a real upgrade over the DuckDB-file store this replaced —
+DuckDB takes an exclusive lock for as long as any connection is open, so a dashboard literally could
+not read a live campaign's data at all; the first cut of this dashboard worked around that with a
+JSON-snapshot side channel, which is gone now. The one archived script,
+`scripts/migrate_duckdb_to_postgres.py`, one-time-imports the old `data/*.duckdb` result sets
+(kept as a backup, never deleted) — see `configs/*.toml` for the campaigns behind the write-up.

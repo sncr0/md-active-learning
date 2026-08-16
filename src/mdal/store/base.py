@@ -1,11 +1,22 @@
 """Store interface — the seam between 'what was measured' and 'what to do next'.
 
-Kept narrow on purpose so DuckDB can be swapped for Postgres at the
-distributed-executor phase (Stage 2+) without touching any caller.
+Kept narrow on purpose so the backend can be swapped without touching any
+caller — this is exactly what let PostgresStore replace the original
+DuckDB-file store: every campaign/executor/analysis module below only ever
+calls through this Protocol.
 
-CONCURRENCY CONTRACT: exactly one writer. The orchestrator owns the store;
-pool workers return results to it and never open the store themselves.
-DuckDB takes an exclusive file lock, so a second writer is impossible anyway.
+CONCURRENCY CONTRACT: the orchestrator owns the store; pool workers compute
+and return results, never opening the store themselves. Postgres's MVCC means
+readers (the dashboard API) never block on a live writer — unlike the old
+DuckDB file, which took an exclusive lock for as long as any connection was
+open, forcing a separate JSON-snapshot side channel just to expose progress.
+That's gone now; the API queries the same database live.
+
+One thing Postgres does NOT give you for free: running two `run_campaign.py`
+processes against the *same* campaign_id concurrently. Nothing at the DB layer
+stops it, but the acquisition loop still assumes a single driver reading its
+own writes — two drivers would each propose from a stale view of the other's
+in-flight batch. Not a supported use case; each campaign_id has one owner.
 """
 
 from __future__ import annotations

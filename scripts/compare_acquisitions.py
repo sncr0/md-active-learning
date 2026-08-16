@@ -20,7 +20,7 @@ from mdal.analysis.acquisition_comparison import learning_curve
 from mdal.analysis.error_map import error_map
 from mdal.campaign import CampaignSpec, run_campaign
 from mdal.domain import Domain
-from mdal.store import DuckDBStore
+from mdal.store import PostgresStore
 
 STRATEGIES = ["latin_hypercube", "max_variance", "epistemic", "alc_imse"]
 COLORS = {"latin_hypercube": "C0", "max_variance": "C1", "epistemic": "C2", "alc_imse": "C3"}
@@ -47,7 +47,7 @@ def main(n_total: int = 48, n_steps: int = 12000, seeds: str = "0,1,2",
                 strategy=strat, n_initial=n_initial, n_total=n_total, batch=batch,
                 seed=seed, run_defaults=run_defaults,
             )
-            store = DuckDBStore(f"data/cmp_{strat}_s{seed}.duckdb")
+            store = PostgresStore(f"cmp_{strat}_s{seed}")
             t = time.perf_counter()
             run_campaign(store=store, spec=spec, log_fn=lambda m: print("  ", m, flush=True))
             lc = learning_curve(store, domain, "pressure", ns, grid_n=60)
@@ -77,7 +77,7 @@ def main(n_total: int = 48, n_steps: int = 12000, seeds: str = "0,1,2",
     plt.close(fig)
 
     for strat in ("alc_imse", "epistemic", "latin_hypercube"):
-        st = DuckDBStore(f"data/cmp_{strat}_s{seed_list[0]}.duckdb")
+        st = PostgresStore(f"cmp_{strat}_s{seed_list[0]}")
         error_map(st, domain, "pressure", f"results/errmap_{strat}.png")
         st.close()
 

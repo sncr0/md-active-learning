@@ -38,7 +38,7 @@ def test_all_campaign_configs_parse():
     import pathlib
 
     configs = sorted(pathlib.Path("configs").glob("*.toml"))
-    assert len(configs) == 4
+    assert len(configs) == 6
     for path in configs:
         spec = CampaignSpec.from_toml(path)
         assert spec.strategy in REGISTRY

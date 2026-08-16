@@ -1,19 +1,13 @@
-"""DuckDB store machinery: resumability check, roundtrip, idempotent writes,
-and the (X, y, noise_var) read side the surrogate consumes."""
+"""Postgres store machinery: resumability check, roundtrip, idempotent writes,
+and the (X, y, noise_var) read side the surrogate consumes.
+
+Uses the `store` fixture from conftest.py — a PostgresStore scoped to a fresh,
+throwaway campaign_id per test (skips if Postgres isn't reachable)."""
 
 import numpy as np
-import pytest
 
 from mdal.config import RunConfig
 from mdal.records import Observation, RunRecord
-from mdal.store import DuckDBStore
-
-
-@pytest.fixture
-def store():
-    s = DuckDBStore(":memory:")
-    yield s
-    s.close()
 
 
 def _run(t, rho):

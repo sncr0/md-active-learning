@@ -28,6 +28,18 @@ def _config_at(spec: CampaignSpec, point) -> RunConfig:
 
 def run_campaign(spec: CampaignSpec, store: Store, max_workers: int = 8, log_fn=None) -> Store:
     """Drive the campaign to its budget, resuming from whatever is in `store`."""
+    if hasattr(store, "register_campaign"):
+        # Postgres-only: lets the dashboard show a name/strategy/budget instead
+        # of a bare campaign_id. Not part of the Store protocol — DuckDB-style
+        # backends without a shared campaign registry just skip this.
+        store.register_campaign(
+            name=spec.name, strategy=spec.strategy, observable=spec.observable,
+            seed=spec.seed,
+            domain={n: [lo, hi] for n, lo, hi in
+                    zip(spec.domain.names, spec.domain.lows, spec.domain.highs)},
+            n_initial=spec.n_initial, n_total=spec.n_total, batch=spec.batch,
+        )
+
     acquisition = REGISTRY[spec.strategy](seed=spec.seed)
     surrogate = HeteroscedasticGP()
 

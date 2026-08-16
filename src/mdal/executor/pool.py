@@ -7,8 +7,9 @@ Model (§8): OPENMM_CPU_THREADS=1 per worker, 6-8 INDEPENDENT simulations in a
 pool — ~3-4x the aggregate throughput of one multithreaded run. Workers compute
 and return `(RunRecord, [Observation])`; the PARENT is the sole store writer and
 commits each result as its future completes, so a killed session costs exactly
-one in-flight simulation (§2 resumability), and DuckDB's exclusive write lock is
-never contended.
+one in-flight simulation (§2 resumability). Postgres would tolerate concurrent
+writers fine, but there's no reason to introduce that race — one campaign_id
+still has one owning process (see store/base.py).
 """
 
 from __future__ import annotations

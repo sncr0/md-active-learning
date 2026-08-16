@@ -80,15 +80,15 @@ def test_fixed_length_alc_is_constant():
     assert np.all(lengths == 6000)
 
 
-def test_cost_aware_campaign_runs_and_varies_length(tmp_path):
+def test_cost_aware_campaign_runs_and_varies_length(campaign_id):
     pytest.importorskip("openmm")
     from mdal.campaign import run_cost_aware_campaign
-    from mdal.store import DuckDBStore
+    from mdal.store import PostgresStore
 
     domain = Domain()
     run_defaults = dict(n_particles=864, equil_steps=800, sample_interval=100, seed=0)
     cost = LinearCost(fixed=1500.0, per_step=1.0)
-    store = DuckDBStore(str(tmp_path / "ca.duckdb"))
+    store = PostgresStore(campaign_id)
     run_cost_aware_campaign(
         domain, store, budget=30000, run_defaults=run_defaults,
         acquisition=CostAwareALC(cost=cost, l_min=1000, l_max=3000, seed=0),
