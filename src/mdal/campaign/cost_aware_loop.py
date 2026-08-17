@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from mdal import tracking
 from mdal.cost import LinearCost
 from mdal.decision.cost_aware import CostAwareALC, NoiseCoefficientModel
 from mdal.decision.latin_hypercube import LatinHypercube
@@ -58,17 +59,27 @@ def run_cost_aware_campaign(
         run_batch([_config_at(run_defaults, p, init_len) for p in pts], store, max_workers)
         log(f"initial: {len(observed_X())} runs, spent {spent():.0f}/{budget:.0f}")
 
-    # budget-driven rounds
-    while spent() < budget:
-        X, y, noise_var = store.observations_for(observable)
-        surrogate.fit(X, y, noise_var)
-        noise_model = NoiseCoefficientModel(X, noise_var, store.lengths_for(observable))
-        pts, lengths = acquisition.propose(surrogate, noise_model, domain, X, batch=batch)
-        new = run_batch([_config_at(run_defaults, p, ln) for p, ln in zip(pts, lengths)],
-                        store, max_workers)
-        log(f"runs={len(observed_X())} spent={spent():.0f}/{budget:.0f} "
-            f"lengths={sorted(int(x) for x in lengths)}")
-        if not new:
-            break
+    # budget-driven rounds — each surrogate refit logged the same way as the
+    # fixed-length loop (mdal.tracking; no-op if not set up)
+    campaign_id = getattr(store, "campaign_id", f"cost-aware-{observable}-s{seed}")
+    with tracking.campaign_run(
+        campaign_id, strategy=type(acquisition).__name__, observable=observable,
+        params={"budget": budget, "n_initial": n_initial, "init_len": init_len,
+                "batch": batch, "seed": seed},
+    ):
+        round_idx = 0
+        while spent() < budget:
+            X, y, noise_var = store.observations_for(observable)
+            surrogate.fit(X, y, noise_var)
+            round_idx += 1
+            tracking.log_round(round_idx, surrogate, X, observable, domain, campaign_id)
+            noise_model = NoiseCoefficientModel(X, noise_var, store.lengths_for(observable))
+            pts, lengths = acquisition.propose(surrogate, noise_model, domain, X, batch=batch)
+            new = run_batch([_config_at(run_defaults, p, ln) for p, ln in zip(pts, lengths)],
+                            store, max_workers)
+            log(f"runs={len(observed_X())} spent={spent():.0f}/{budget:.0f} "
+                f"lengths={sorted(int(x) for x in lengths)}")
+            if not new:
+                break
 
     return store

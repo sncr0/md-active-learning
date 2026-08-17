@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { getCampaign, listCampaigns } from './api'
+import { getCampaign, getCampaignTracking, listCampaigns } from './api'
 import { CampaignRail, strategyLabel } from './components/CampaignRail'
 import { RunList } from './components/RunList'
-import type { CampaignDetail, CampaignSummary } from './types'
+import { TrackingPanel } from './components/TrackingPanel'
+import type { CampaignDetail, CampaignSummary, CampaignTracking } from './types'
 
 const LIST_POLL_MS = 4000
 const DETAIL_POLL_MS = 3000
@@ -13,6 +14,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<CampaignDetail | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [tracking, setTracking] = useState<CampaignTracking | null>(null)
   const [online, setOnline] = useState(true)
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export default function App() {
   useEffect(() => {
     if (!selectedId) {
       setDetail(null)
+      setTracking(null)
       return
     }
     let cancelled = false
@@ -60,6 +63,14 @@ export default function App() {
         }
       } catch {
         if (!cancelled) setDetailError('Failed to load campaign detail.')
+      }
+      // MLflow tracking is optional and fails soft server-side — a failed
+      // fetch here just means "nothing to show", not an error banner.
+      try {
+        const t = await getCampaignTracking(selectedId as string)
+        if (!cancelled) setTracking(t)
+      } catch {
+        if (!cancelled) setTracking(null)
       }
     }
     fetchDetail()
@@ -137,6 +148,7 @@ export default function App() {
             </div>
             {detailError && <div className="error">{detailError}</div>}
             {!detailError && !detail && <div className="loading">Loading runs…</div>}
+            {detail && <TrackingPanel tracking={tracking} />}
             {detail && <RunList campaign={detail} />}
           </section>
         )}

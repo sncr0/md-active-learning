@@ -16,6 +16,7 @@ md = ["openmm>=8.2"]
 surrogate = ["scikit-learn>=1.4"]
 viz = ["matplotlib>=3.7"]
 api = ["fastapi>=0.110", "uvicorn[standard]>=0.30"]
+mlflow = ["mlflow>=2.14"]  # campaign/loop.py, campaign/cost_aware_loop.py surrogate-fit tracking
 migrate = ["duckdb>=1.0"]  # scripts/migrate_duckdb_to_postgres.py only
 
 [dependency-groups]

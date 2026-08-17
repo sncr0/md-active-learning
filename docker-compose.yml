@@ -15,5 +15,25 @@ services:
       timeout: 3s
       retries: 10
 
+  mlflow:
+    build: ./docker/mlflow
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5001:5000"
+    volumes:
+      - mdal_mlruns:/mlruns
+    command:
+      # mlflow-artifacts: (proxied) rather than a plain path: campaigns run on the
+      # host, not inside this container, so the client needs artifact reads/writes
+      # routed through the server's HTTP API — it has no direct filesystem access
+      # to the mdal_mlruns volume. --artifacts-destination is where the server
+      # actually puts the bytes once it's proxying them.
+      - --backend-store-uri=postgresql+psycopg2://mdal:mdal@db:5432/mlflow
+      - --default-artifact-root=mlflow-artifacts:/
+      - --artifacts-destination=/mlruns
+
 volumes:
   mdal_pgdata:
+  mdal_mlruns:

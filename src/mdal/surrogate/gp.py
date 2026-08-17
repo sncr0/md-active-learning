@@ -108,6 +108,29 @@ class HeteroscedasticGP:
         total_var = epi_var + self.predict_noise_var(X)
         return mean, np.sqrt(total_var)
 
+    @property
+    def fitted_estimator(self) -> GaussianProcessRegressor | None:
+        """The underlying sklearn estimator, for export/tracking. None until fit()."""
+        return self._gp if self._fitted else None
+
+    def diagnostics(self) -> dict:
+        """Flat dict of fit diagnostics for experiment tracking — log-marginal-
+        likelihood plus every numeric learned kernel hyperparameter (length
+        scales, amplitude). Not used by the surrogate/decision layers
+        themselves; generic over whatever kernel `fit()` ended up with, so it
+        doesn't assume the default ConstantKernel * RBF structure.
+        """
+        if not self._fitted:
+            return {}
+        out = {"log_marginal_likelihood": float(self._gp.log_marginal_likelihood())}
+        for name, val in self._gp.kernel_.get_params().items():
+            if isinstance(val, (int, float, np.floating)):
+                out[f"kernel_{name}"] = float(val)
+            elif isinstance(val, np.ndarray) and val.ndim == 1:
+                for i, v in enumerate(val):
+                    out[f"kernel_{name}_{i}"] = float(v)
+        return out
+
     def posterior_cov(self, A, B=None) -> np.ndarray:
         """Latent (epistemic) posterior covariance, in observable^2 units.
 

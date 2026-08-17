@@ -17,6 +17,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
 
+from mdal.api import mlflow_client
 from mdal.store.postgres_store import default_dsn
 
 app = FastAPI(title="md-active-learning dashboard API")
@@ -132,6 +133,18 @@ def get_campaign(campaign_id: str) -> dict:
         "progress": (n_complete / n_total) if n_total else 1.0,
         "runs": shaped_runs,
     }
+
+
+@app.get("/api/campaigns/{campaign_id}/tracking")
+def get_campaign_tracking(campaign_id: str) -> dict:
+    """Round-by-round surrogate-fit metrics from MLflow (mdal.tracking).
+
+    Separate from get_campaign: that's simulation provenance (Postgres, always
+    present); this is ML telemetry (MLflow, optional). {"available": False} —
+    never a 5xx — whenever there's nothing to show, so the dashboard degrades
+    to just hiding the panel rather than erroring.
+    """
+    return mlflow_client.campaign_tracking(campaign_id)
 
 
 @app.get("/api/health")

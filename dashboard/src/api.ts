@@ -1,4 +1,4 @@
-import type { CampaignDetail, CampaignSummary } from './types'
+import type { CampaignDetail, CampaignSummary, CampaignTracking } from './types'
 
 async function getJSON<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -12,4 +12,8 @@ export function listCampaigns(): Promise<CampaignSummary[]> {
 
 export function getCampaign(id: string): Promise<CampaignDetail> {
   return getJSON(`/api/campaigns/${encodeURIComponent(id)}`)
+}
+
+export function getCampaignTracking(id: string): Promise<CampaignTracking> {
+  return getJSON(`/api/campaigns/${encodeURIComponent(id)}/tracking`)
 }

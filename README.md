@@ -195,9 +195,10 @@ src/mdal/
   campaign/      the active-learning loops
   analysis/      error map + acquisition comparison
   api/           read-only dashboard API, live queries (see below)
+  tracking.py    optional MLflow logging of surrogate fits (see below)
 tests/           unit + integration tests        scripts/   benchmark, campaign, and figure drivers
 dashboard/       React + Vite frontend for the campaign dashboard
-docker/          Postgres image (schema in docker/postgres/init.sql)
+docker/          Postgres image (docker/postgres) + MLflow tracking server (docker/mlflow)
 ```
 
 ## Running
@@ -231,6 +232,58 @@ uv run python scripts/run_campaign.py configs/alc_imse.toml  # a live campaign, 
 uv run python scripts/run_api.py                             # dashboard API on :8000
 cd dashboard && npm install && npm run dev                   # frontend on :5173 (proxies /api -> :8000)
 ```
+
+## Experiment tracking (MLflow)
+
+The Postgres store is simulation *provenance* — content-hash-keyed, "was this exact state point
+already run". It deliberately says nothing about how well the surrogate is learning. That's a
+separate, genuinely ML concern — kernel hyperparameters, log-marginal-likelihood, accuracy against
+the analytic reference EOS, round over round — and it's what `mdal.tracking` logs to MLflow.
+
+```bash
+docker compose up -d db mlflow                                # postgres + mlflow tracking server on :5001
+uv sync --extra mlflow                                        # mlflow client
+uv run python scripts/run_campaign.py configs/alc_imse.toml   # logs automatically while it runs
+```
+
+Then open `http://localhost:5001`. One experiment, `mdal-campaigns`, holds every campaign as a
+top-level run (tagged `campaign_id`/`strategy`/`observable`, so the run list is directly comparable
+across strategies — the same comparison `scripts/compare_acquisitions.py` does offline); each
+active-learning round's surrogate refit is a nested run underneath it, with the learned kernel
+hyperparameters and RMSE against the Kolafa-Nezbeda EOS as metrics you can watch live and diff
+across campaigns in the UI — and the exact fitted GP itself, logged as a real MLflow model
+(skops-serialized `GaussianProcessRegressor`), downloadable from that round's run page.
+
+The dashboard (see below) surfaces the headline version of this without leaving it: each campaign's
+detail view has a "Surrogate learning" panel — RMSE-vs-round and log-marginal-likelihood-vs-round,
+plus an "open in MLflow" link for the full run — read live from MLflow's REST API by
+`mdal.api.mlflow_client` (stdlib `urllib`, not the `mlflow` package, so the dashboard's `api` extra
+stays light). Same fails-soft contract: no tracking data for a campaign just means that panel is
+absent, never an error.
+
+Tracking is entirely optional and fails soft, the same way the oracle degrades without the `md`
+extra: without `mlflow` installed, or if the tracking server at `MLFLOW_TRACKING_URI` (default
+`http://localhost:5001`) isn't reachable, `mdal.tracking` no-ops and campaigns behave exactly as
+they did before it existed — a campaign never fails because MLflow is down. MLflow's own schema
+lives in a separate `mlflow` database on the same Postgres server (`docker/postgres/00-create-mlflow-db.sql`),
+never mixed into `mdal`'s tables. Artifacts are proxied through the tracking server
+(`--default-artifact-root=mlflow-artifacts:/`) rather than written to a plain path — campaigns run
+on the host, not inside the `mlflow` container, so the client has no direct filesystem access to the
+`mdal_mlruns` volume and needs the HTTP round-trip; `--artifacts-destination` is where the server
+actually puts the bytes once it's proxying (local-disk for now — swap it for an S3/MinIO URI in
+`docker/mlflow` if this stops being a single-machine setup).
+
+Campaigns that ran before `mdal.tracking` existed have no MLflow history by default — nothing was
+rerun retroactively. `scripts/backfill_mlflow.py` fills that in without resimulating anything: it
+refits the surrogate on successive prefixes of each campaign's already-stored observations (same
+round boundaries the dashboard already uses) and logs the result with the run's *actual* historical
+timestamps, not "now". Run it with no arguments to backfill every untracked campaign, shortest
+average simulation time first (`uv run python scripts/backfill_mlflow.py`), or name specific
+campaign IDs to backfill just those.
+
+**Why not put the oracle runs in MLflow too:** MLflow runs aren't content-addressed, so they can't
+give you the store's core property — "does this exact simulation already exist, skip it if so".
+The two systems track different things and are joined by `campaign_id`, not merged.
 
 **Why Postgres:** every campaign — not just the dashboard's — now lives in one shared database
 (`runs`/`observations` keyed by `(campaign_id, run_hash)`, plus a `campaigns` table for

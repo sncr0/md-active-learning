@@ -61,3 +61,13 @@ export interface CampaignDetail extends CampaignSummary {
   domain: Record<string, [number, number]>
   runs: Run[]
 }
+
+export interface TrackingRound {
+  round: number
+  n_points: number
+  metrics: Record<string, number>
+}
+
+export type CampaignTracking =
+  | { available: false }
+  | { available: true; mlflow_url: string; rounds: TrackingRound[] }
