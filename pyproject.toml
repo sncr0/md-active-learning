@@ -18,6 +18,7 @@ viz = ["matplotlib>=3.7"]
 api = ["fastapi>=0.110", "uvicorn[standard]>=0.30"]
 mlflow = ["mlflow>=2.14"]  # campaign/loop.py, campaign/cost_aware_loop.py surrogate-fit tracking
 migrate = ["duckdb>=1.0"]  # scripts/migrate_duckdb_to_postgres.py only
+dl = ["torch>=2.2"]  # mdal.analysis.dl_surrogates only — deep-learning UQ baselines
 
 [dependency-groups]
 dev = ["pytest>=8.0"]
@@ -31,3 +32,7 @@ packages = ["src/mdal"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: full-strength training runs (deep-learning surrogates) — deselected by default; run explicitly with `uv run pytest -m slow`",
+]
