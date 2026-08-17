@@ -127,58 +127,161 @@ h2 {
   margin: 0 0 0.9rem;
 }
 
-/* ---------- campaign rail ---------- */
+/* ---------- campaign table ---------- */
 
-.campaign-rail {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 0.7rem;
-}
-
-.campaign-card {
-  text-align: left;
-  border: 1px solid var(--hair);
-  background: var(--bg);
-  border-radius: 12px;
-  padding: 0.95rem 1.05rem 0.9rem;
-  cursor: pointer;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+.campaign-toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  font: inherit;
-  color: inherit;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.2rem;
+  margin-bottom: 0.9rem;
 }
 
-.campaign-card:hover {
+.filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.filter-chip {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  padding: 0.28em 0.75em;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.filter-chip:hover {
   border-color: var(--hair-strong);
 }
 
-.campaign-card.selected {
+.filter-chip.active {
+  background: var(--accent-soft);
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.campaign-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.campaign-name {
+  color: var(--accent);
   font-weight: 600;
-  font-size: 0.92rem;
-  line-height: 1.25;
 }
 
-.strategy-tag {
+.campaign-table {
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.campaign-row {
+  display: grid;
+  grid-template-columns: 20px 1fr 120px 84px 76px 64px 84px 84px 84px 20px;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--hair);
+  background: var(--bg);
+  font-size: 0.85rem;
+}
+
+.campaign-row-group:last-child .campaign-row:not(.expanded) {
+  border-bottom: none;
+}
+
+.campaign-row.campaign-head {
+  background: var(--panel);
+  padding: 0.5rem 0.9rem;
+}
+
+.campaign-row:not(.campaign-head) {
+  cursor: pointer;
+}
+
+.campaign-row:not(.campaign-head):hover {
+  background: var(--panel);
+}
+
+.campaign-row.expanded {
+  background: var(--panel);
+  border-bottom-color: var(--hair-strong);
+}
+
+.campaign-row-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.campaign-row-strategy {
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.campaign-row-updated {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.num {
+  text-align: right;
+}
+
+.tabular {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.metric-r2 {
+  font-weight: 650;
+}
+
+.sort-btn {
+  all: unset;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-top: 0.15rem;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.sort-btn:hover {
+  color: var(--muted);
+}
+
+.sort-btn.active {
+  color: var(--accent);
+}
+
+.sort-btn.num {
+  justify-self: end;
+}
+
+.sort-arrow {
+  font-size: 0.6rem;
+}
+
+.campaign-detail-slot {
+  padding: 1.1rem 1.1rem 1.3rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--hair);
+}
+
+.campaign-row-group:last-child .campaign-detail-slot {
+  border-bottom: none;
+}
+
+.campaign-detail-panel .campaign-meta {
+  margin-bottom: 1.1rem;
 }
 
 .pill {
@@ -228,55 +331,7 @@ h2 {
   }
 }
 
-.bar {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--panel-2);
-  overflow: hidden;
-}
-
-.bar > span {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  border-radius: 3px 0 0 3px;
-  transition: width 0.4s ease;
-}
-
-.bar.complete > span {
-  background: var(--good);
-}
-
-.progress-line {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-
-.progress-line b {
-  color: var(--ink);
-}
-
-/* ---------- selected campaign header ---------- */
-
-.campaign-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.8rem 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--hair);
-  margin-bottom: 1.1rem;
-}
-
-.campaign-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 650;
-}
+/* ---------- campaign detail meta ---------- */
 
 .campaign-meta {
   display: flex;
@@ -338,6 +393,27 @@ h2 {
 
 .tracking-link:hover {
   text-decoration: underline;
+}
+
+.tracking-group-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 650;
+  margin: 1.1rem 0 0.6rem;
+}
+
+.tracking-group-label:first-of-type {
+  margin-top: 0;
+}
+
+.tracking-group-sub {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  color: var(--faint);
 }
 
 .tracking-charts {
@@ -457,9 +533,34 @@ h2 {
   overflow: hidden;
 }
 
+.round-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.5rem 0.9rem;
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--hair);
+}
+
+.round-group:not(:first-child) .round-group-head {
+  border-top: 1px solid var(--hair);
+}
+
+.round-group-stats {
+  text-transform: none;
+  letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+
 .run-row {
   display: grid;
-  grid-template-columns: 20px 88px 74px 74px 1fr 92px 90px 20px;
+  grid-template-columns: 20px 74px 74px 1fr 92px 90px 20px;
   align-items: center;
   gap: 0.6rem;
   padding: 0.55rem 0.9rem;
@@ -479,12 +580,6 @@ h2 {
 
 .run-row.expanded {
   background: var(--panel);
-}
-
-.run-row .round-tag {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--faint);
 }
 
 .run-row .statepoint {

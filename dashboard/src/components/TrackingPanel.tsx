@@ -139,11 +139,6 @@ function RoundLineChart({
   )
 }
 
-const METRIC_LABELS: Record<string, string> = {
-  rmse_vs_reference: 'RMSE vs. reference EOS',
-  log_marginal_likelihood: 'Log-marginal-likelihood',
-}
-
 function seriesFor(rounds: TrackingRound[], key: string): Point[] {
   return rounds
     .filter((r) => r.metrics[key] !== undefined)
@@ -151,8 +146,16 @@ function seriesFor(rounds: TrackingRound[], key: string): Point[] {
 }
 
 export function TrackingPanel({ tracking }: { tracking: CampaignTracking | null }) {
+  const r2 = useMemo(
+    () => (tracking?.available ? seriesFor(tracking.rounds, 'r_squared_vs_reference') : []),
+    [tracking],
+  )
   const rmse = useMemo(
     () => (tracking?.available ? seriesFor(tracking.rounds, 'rmse_vs_reference') : []),
+    [tracking],
+  )
+  const epistemic = useMemo(
+    () => (tracking?.available ? seriesFor(tracking.rounds, 'mean_epistemic_std') : []),
     [tracking],
   )
   const lml = useMemo(
@@ -182,9 +185,21 @@ export function TrackingPanel({ tracking }: { tracking: CampaignTracking | null 
           open in MLflow ↗
         </a>
       </div>
+
+      <div className="tracking-group-label">
+        Predictive accuracy <span className="tracking-group-sub">— vs. the analytic reference EOS</span>
+      </div>
       <div className="tracking-charts">
-        <RoundLineChart title={METRIC_LABELS.rmse_vs_reference} points={rmse} height={168} emphasis />
-        <RoundLineChart title={METRIC_LABELS.log_marginal_likelihood} points={lml} height={112} />
+        <RoundLineChart title="R² vs. reference EOS" points={r2} height={168} emphasis />
+        <RoundLineChart title="RMSE vs. reference EOS" points={rmse} height={168} />
+      </div>
+
+      <div className="tracking-group-label">
+        Model diagnostics <span className="tracking-group-sub">— the fit's own behavior, not accuracy</span>
+      </div>
+      <div className="tracking-charts">
+        <RoundLineChart title="Mean epistemic std" points={epistemic} height={112} />
+        <RoundLineChart title="Log-marginal-likelihood" points={lml} height={112} />
       </div>
     </div>
   )

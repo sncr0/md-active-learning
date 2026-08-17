@@ -37,3 +37,39 @@ def integrated_abs_error(
     grid = domain.grid(grid_n)
     pred, _ = gp.predict(grid)
     return float(np.mean(np.abs(pred - reference_surface(observable, grid))))
+
+
+def error_map_figure(surrogate, X: np.ndarray, domain: Domain, observable: str, grid_n: int = 60):
+    """Signed error heatmap (surrogate - reference) with sample points overlaid.
+
+    Shows simultaneously what the surrogate knows (prediction error vs the
+    Kolafa-Nezbeda ground truth) and where the campaign chose to look. Returns
+    (Figure, mean |error|) — caller decides what to do with the figure
+    (`mdal.analysis.error_map` saves it to disk; `mdal.tracking` logs it to
+    MLflow as a round artifact) and must close it when done.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    grid = domain.grid(grid_n)
+    pred, _ = surrogate.predict(grid)
+    err = pred - reference_surface(observable, grid)
+
+    T = grid[:, 0].reshape(grid_n, grid_n)
+    R = grid[:, 1].reshape(grid_n, grid_n)
+    E = err.reshape(grid_n, grid_n)
+    lim = float(np.abs(err).max()) or 1e-9
+
+    fig, ax = plt.subplots(figsize=(5.4, 4.3))
+    pc = ax.pcolormesh(T, R, E, shading="auto", cmap="RdBu_r", vmin=-lim, vmax=lim)
+    ax.scatter(X[:, 0], X[:, 1], s=14, c="k", edgecolors="w", linewidths=0.5,
+               label=f"{len(X)} simulations")
+    fig.colorbar(pc, ax=ax, label=f"surrogate - reference  ({observable})")
+    ax.set_xlabel("T*")
+    ax.set_ylabel("rho*")
+    ax.set_title(f"mean |err| = {np.mean(np.abs(err)):.4f}")
+    ax.legend(loc="upper left", fontsize=7)
+    fig.tight_layout()
+    return fig, float(np.mean(np.abs(err)))

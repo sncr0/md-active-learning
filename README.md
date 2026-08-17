@@ -221,8 +221,9 @@ are on one laptop, seconds per simulation.
 
 ## Dashboard
 
-A live campaign dashboard — which simulations are done, which are still running, and what each one
-measured — backed by a small read-only API and a React frontend.
+Every campaign, ranked: a sortable/filterable list (name, strategy, status, runs, rounds, R², RMSE)
+backed by a small read-only API and a React frontend. Opening a row expands it inline — domain/seed,
+the surrogate's learning curves, and the individual runs grouped by AL round.
 
 ```bash
 docker compose up -d db                                      # postgres, if not already running
@@ -237,8 +238,9 @@ cd dashboard && npm install && npm run dev                   # frontend on :5173
 
 The Postgres store is simulation *provenance* — content-hash-keyed, "was this exact state point
 already run". It deliberately says nothing about how well the surrogate is learning. That's a
-separate, genuinely ML concern — kernel hyperparameters, log-marginal-likelihood, accuracy against
-the analytic reference EOS, round over round — and it's what `mdal.tracking` logs to MLflow.
+separate, genuinely ML concern — kernel hyperparameters, log-marginal-likelihood, R² and RMSE against
+the analytic reference EOS, the model's own epistemic uncertainty, round over round — and it's what
+`mdal.tracking` logs to MLflow.
 
 ```bash
 docker compose up -d db mlflow                                # postgres + mlflow tracking server on :5001
@@ -249,17 +251,26 @@ uv run python scripts/run_campaign.py configs/alc_imse.toml   # logs automatical
 Then open `http://localhost:5001`. One experiment, `mdal-campaigns`, holds every campaign as a
 top-level run (tagged `campaign_id`/`strategy`/`observable`, so the run list is directly comparable
 across strategies — the same comparison `scripts/compare_acquisitions.py` does offline); each
-active-learning round's surrogate refit is a nested run underneath it, with the learned kernel
-hyperparameters and RMSE against the Kolafa-Nezbeda EOS as metrics you can watch live and diff
-across campaigns in the UI — and the exact fitted GP itself, logged as a real MLflow model
-(skops-serialized `GaussianProcessRegressor`), downloadable from that round's run page.
+active-learning round's surrogate refit is a nested run underneath it. Deliberately leans on what
+MLflow already renders natively, rather than only logging numbers into a table:
 
-The dashboard (see below) surfaces the headline version of this without leaving it: each campaign's
-detail view has a "Surrogate learning" panel — RMSE-vs-round and log-marginal-likelihood-vs-round,
-plus an "open in MLflow" link for the full run — read live from MLflow's REST API by
-`mdal.api.mlflow_client` (stdlib `urllib`, not the `mlflow` package, so the dashboard's `api` extra
-stays light). Same fails-soft contract: no tracking data for a campaign just means that panel is
-absent, never an error.
+- **The campaign's own "Model metrics" tab is a live learning curve** — every round's scores
+  (R², RMSE, mean epistemic std, log-marginal-likelihood) are logged a second time onto the *parent*
+  run with `step=round`, which MLflow auto-plots as an interactive line chart with zero extra
+  tooling, right on the run you'd open anyway.
+- **Each round's Artifacts tab has an error-map image** — surrogate-minus-reference over the domain,
+  sample points overlaid (`mdal.analysis.error_map_figure`, the same plot `compare_acquisitions.py`
+  saves to disk, logged instead via `mlflow.log_figure`) — where the surrogate is wrong and where
+  it's looked, browsable round by round without leaving MLflow.
+- **The exact fitted GP itself** is logged as a real MLflow model (skops-serialized
+  `GaussianProcessRegressor`), downloadable from that round's run page.
+
+The dashboard (see above) surfaces the headline version of this without leaving it: each campaign's
+expanded row has a "Surrogate learning" panel — R²/RMSE (predictive accuracy) and mean-epistemic-std/
+log-marginal-likelihood (model diagnostics) vs. round, plus an "open in MLflow" link for the rest —
+read live from MLflow's REST API by `mdal.api.mlflow_client` (stdlib `urllib`, not the `mlflow`
+package, so the dashboard's `api` extra stays light). Same fails-soft contract: no tracking data for
+a campaign just means that panel is absent, never an error.
 
 Tracking is entirely optional and fails soft, the same way the oracle degrades without the `md`
 extra: without `mlflow` installed, or if the tracking server at `MLFLOW_TRACKING_URI` (default

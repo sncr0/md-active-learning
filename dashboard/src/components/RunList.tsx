@@ -5,10 +5,6 @@ function fmt(n: number | undefined, d = 3): string {
   return n === undefined ? '—' : n.toFixed(d)
 }
 
-function roundLabel(run: Run): string {
-  return run.round === 0 ? 'initial' : `round ${run.round}`
-}
-
 const OBS_UNIT: Record<string, string> = {
   pressure: 'P*',
   energy: 'U*',
@@ -38,7 +34,10 @@ function RunDetail({ run }: { run: Run }) {
           <dt>status</dt>
           <dd>{run.status}</dd>
           <dt>created</dt>
-          <dd>{run.created_at ? new Date(run.created_at + 'Z').toLocaleString() : '—'}</dd>
+          {/* created_at is Python's timezone-aware isoformat() — already carries an
+              explicit +00:00 offset, same as updated_at (see format.ts); appending
+              'Z' double-marks the timezone and Date() rejects it as invalid. */}
+          <dd>{run.created_at ? new Date(run.created_at).toLocaleString() : '—'}</dd>
           <dt>wall clock</dt>
           <dd>{fmt(run.wall_clock_s, 2)} s</dd>
           <dt>frames</dt>
@@ -94,7 +93,6 @@ function RunRow({
         }}
       >
         <span className="status-dot complete" title="complete" />
-        <span className="round-tag">{roundLabel(run)}</span>
         <span className="statepoint">T {fmt(run.temperature, 2)}</span>
         <span className="statepoint">ρ {fmt(run.density, 2)}</span>
         <span className="observable">
@@ -115,6 +113,28 @@ function RunRow({
   )
 }
 
+function roundGroups(runs: Run[]): [number, Run[]][] {
+  // Most-recent-first overall (as before), which — since round is monotonic
+  // in run order — naturally yields groups in descending round order too.
+  const groups = new Map<number, Run[]>()
+  for (const run of runs.slice().reverse()) {
+    const list = groups.get(run.round)
+    if (list) list.push(run)
+    else groups.set(run.round, [run])
+  }
+  return Array.from(groups.entries())
+}
+
+function roundStats(runs: Run[], observable: string): string {
+  const label = runs.length === 1 ? 'run' : 'runs'
+  const values = runs
+    .map((r) => r.observations[observable]?.value)
+    .filter((v): v is number => v !== undefined)
+  if (values.length === 0) return `${runs.length} ${label}`
+  const mean = values.reduce((a, b) => a + b, 0) / values.length
+  return `${runs.length} ${label} · mean ${OBS_UNIT[observable] ?? observable} ${mean.toFixed(3)}`
+}
+
 export function RunList({ campaign }: { campaign: CampaignDetail }) {
   const [expandedHash, setExpandedHash] = useState<string | null>(null)
   const pending = campaign.budget.n_total - campaign.n_complete
@@ -131,17 +151,22 @@ export function RunList({ campaign }: { campaign: CampaignDetail }) {
       </div>
       <div className="run-list">
         {campaign.runs.length === 0 && <div className="empty">No runs recorded yet.</div>}
-        {campaign.runs
-          .slice()
-          .reverse()
-          .map((run) => (
-            <RunRow
-              key={run.run_hash}
-              run={run}
-              expanded={expandedHash === run.run_hash}
-              onToggle={() => setExpandedHash(expandedHash === run.run_hash ? null : run.run_hash)}
-            />
-          ))}
+        {roundGroups(campaign.runs).map(([round, runs]) => (
+          <div key={round} className="round-group">
+            <div className="round-group-head">
+              <span>{round === 0 ? 'Initial design' : `Round ${round}`}</span>
+              <span className="round-group-stats">{roundStats(runs, campaign.observable)}</span>
+            </div>
+            {runs.map((run) => (
+              <RunRow
+                key={run.run_hash}
+                run={run}
+                expanded={expandedHash === run.run_hash}
+                onToggle={() => setExpandedHash(expandedHash === run.run_hash ? null : run.run_hash)}
+              />
+            ))}
+          </div>
+        ))}
         {pending > 0 && (
           <div className="pending-row">
             <span className="status-dot pending" />

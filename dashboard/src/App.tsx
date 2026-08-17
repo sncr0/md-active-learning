@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getCampaign, getCampaignTracking, listCampaigns } from './api'
-import { CampaignRail, strategyLabel } from './components/CampaignRail'
-import { RunList } from './components/RunList'
-import { TrackingPanel } from './components/TrackingPanel'
+import { CampaignDetailPanel } from './components/CampaignDetailPanel'
+import { CampaignTable } from './components/CampaignTable'
 import type { CampaignDetail, CampaignSummary, CampaignTracking } from './types'
 
 const LIST_POLL_MS = 4000
@@ -11,7 +10,7 @@ const DETAIL_POLL_MS = 3000
 export default function App() {
   const [campaigns, setCampaigns] = useState<CampaignSummary[] | null>(null)
   const [listError, setListError] = useState<string | null>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<CampaignDetail | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [tracking, setTracking] = useState<CampaignTracking | null>(null)
@@ -26,11 +25,6 @@ export default function App() {
         setCampaigns(data)
         setListError(null)
         setOnline(true)
-        setSelectedId((prev) => {
-          if (prev && data.some((c) => c.id === prev)) return prev
-          const running = data.find((c) => c.status === 'running')
-          return (running ?? data[0])?.id ?? null
-        })
       } catch {
         if (cancelled) return
         setOnline(false)
@@ -45,10 +39,14 @@ export default function App() {
     }
   }, [])
 
-  const selectedSummary = campaigns?.find((c) => c.id === selectedId) ?? null
+  const expandedSummary = campaigns?.find((c) => c.id === expandedId) ?? null
+
+  function toggleExpanded(id: string) {
+    setExpandedId((prev) => (prev === id ? null : id))
+  }
 
   useEffect(() => {
-    if (!selectedId) {
+    if (!expandedId) {
       setDetail(null)
       setTracking(null)
       return
@@ -56,7 +54,7 @@ export default function App() {
     let cancelled = false
     async function fetchDetail() {
       try {
-        const d = await getCampaign(selectedId as string)
+        const d = await getCampaign(expandedId as string)
         if (!cancelled) {
           setDetail(d)
           setDetailError(null)
@@ -67,7 +65,7 @@ export default function App() {
       // MLflow tracking is optional and fails soft server-side — a failed
       // fetch here just means "nothing to show", not an error banner.
       try {
-        const t = await getCampaignTracking(selectedId as string)
+        const t = await getCampaignTracking(expandedId as string)
         if (!cancelled) setTracking(t)
       } catch {
         if (!cancelled) setTracking(null)
@@ -75,14 +73,14 @@ export default function App() {
     }
     fetchDetail()
     let intervalId: number | undefined
-    if (selectedSummary?.status === 'running') {
+    if (expandedSummary?.status === 'running') {
       intervalId = window.setInterval(fetchDetail, DETAIL_POLL_MS)
     }
     return () => {
       cancelled = true
       if (intervalId) clearInterval(intervalId)
     }
-  }, [selectedId, selectedSummary?.status])
+  }, [expandedId, expandedSummary?.status])
 
   return (
     <>
@@ -90,8 +88,9 @@ export default function App() {
         <p className="kicker">Molecular Dynamics × Active Learning</p>
         <h1>Campaign dashboard</h1>
         <p className="sub">
-          Design of experiments for the LJ equation-of-state campaigns — which simulations have
-          run, which are still in flight, and what each one measured.
+          Every LJ equation-of-state campaign, ranked by how well its surrogate predicts the
+          reference EOS — sort and filter to compare strategies, open one for the learning curve
+          and the individual runs behind it.
         </p>
         <div className="api-state">
           <span className={`dot-live${online ? '' : ' offline'}`} />
@@ -111,47 +110,16 @@ export default function App() {
             </div>
           )}
           {campaigns && campaigns.length > 0 && (
-            <CampaignRail campaigns={campaigns} selectedId={selectedId} onSelect={setSelectedId} />
+            <CampaignTable
+              campaigns={campaigns}
+              expandedId={expandedId}
+              onToggle={toggleExpanded}
+              renderDetail={() => (
+                <CampaignDetailPanel detail={detail} tracking={tracking} detailError={detailError} />
+              )}
+            />
           )}
         </section>
-
-        {selectedSummary && (
-          <section className="block">
-            <h2>Simulations</h2>
-            <div className="campaign-header">
-              <h3>{selectedSummary.name}</h3>
-              <div className="campaign-meta">
-                <span>
-                  strategy <b>{strategyLabel(selectedSummary.strategy)}</b>
-                </span>
-                <span>
-                  observable <b>{selectedSummary.observable}</b>
-                </span>
-                {detail && (
-                  <span>
-                    domain{' '}
-                    <b>
-                      T* [{detail.domain.temperature[0]}, {detail.domain.temperature[1]}]
-                    </b>{' '}
-                    ×{' '}
-                    <b>
-                      ρ* [{detail.domain.density[0]}, {detail.domain.density[1]}]
-                    </b>
-                  </span>
-                )}
-                {detail && (
-                  <span>
-                    seed <b>{detail.seed}</b>
-                  </span>
-                )}
-              </div>
-            </div>
-            {detailError && <div className="error">{detailError}</div>}
-            {!detailError && !detail && <div className="loading">Loading runs…</div>}
-            {detail && <TrackingPanel tracking={tracking} />}
-            {detail && <RunList campaign={detail} />}
-          </section>
-        )}
       </div>
 
       <div className="page">

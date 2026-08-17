@@ -20,6 +20,7 @@ Postgres table); each AL round's surrogate fit is a nested run underneath it.
 from __future__ import annotations
 
 import os
+import time
 import warnings
 from contextlib import contextmanager
 
@@ -87,21 +88,46 @@ def log_round(
 ) -> None:
     """Log one AL round's surrogate fit as a nested run under the active campaign run.
 
-    Also logs the fitted sklearn estimator as a model artifact, if the surrogate
-    exposes one (`fitted_estimator`) — so a round's exact posterior is retrievable
-    from the MLflow UI/registry, not just its summary metrics.
+    Three things happen, each in its own try/except so a failure in one (a
+    plotting bug, an unpicklable kernel type) never costs the others:
+
+    1. The round's own metrics/params on its nested run.
+    2. The SAME metrics logged with step=round_idx onto the *parent* campaign
+       run — MLflow renders any step-indexed metric as a native line chart on
+       that run's own Metrics tab, so the campaign's learning curve is visible
+       without leaving its page or comparing runs by hand.
+    3. An error-map image (surrogate - reference, sample points overlaid) as
+       an artifact on the round's own run — the one plot that's actually
+       useful per round: where the surrogate is wrong, where it's looked.
+       Plus the fitted sklearn estimator as a model artifact, if the surrogate
+       exposes one (`fitted_estimator`) — a round's exact posterior is then
+       retrievable from the MLflow UI/registry, not just its summary metrics.
     """
     if mlflow is None or mlflow.active_run() is None:
         return
+    parent_run_id = mlflow.active_run().info.run_id
+    metrics = {**getattr(surrogate, "diagnostics", dict)(), **score_vs_reference(surrogate, observable, domain)}
+
+    if metrics:
+        try:
+            from mlflow.entities import Metric
+            from mlflow.tracking import MlflowClient
+
+            now_ms = int(time.time() * 1000)
+            MlflowClient().log_batch(
+                parent_run_id,
+                metrics=[Metric(k, v, now_ms, round_idx) for k, v in metrics.items()],
+            )
+        except Exception as exc:
+            _warn_once(f"parent trend metrics not logged: {exc}")
+
     try:
         with mlflow.start_run(run_name=f"round-{round_idx}", nested=True, tags={
             "campaign_id": campaign_id, "round": str(round_idx),
         }):
             mlflow.log_params({"round": round_idx, "n_points": len(X)})
-            mlflow.log_metrics(getattr(surrogate, "diagnostics", dict)())
-            rmse = rmse_vs_reference(surrogate, observable, domain)
-            if rmse is not None:
-                mlflow.log_metric("rmse_vs_reference", rmse)
+            mlflow.log_metrics(metrics)
+
             # Model logging is its own try/except: a serialization failure here
             # (e.g. skops rejecting an unrecognized kernel type) must never cost
             # the metrics above, which are already committed by this point.
@@ -115,16 +141,39 @@ def log_round(
                     )
                 except Exception as exc:
                     _warn_once(f"model artifact not logged: {exc}")
+
+            try:
+                from mdal.analysis._common import error_map_figure
+
+                fig, _ = error_map_figure(surrogate, X, domain, observable)
+                mlflow.log_figure(fig, "error_map.png")
+                import matplotlib.pyplot as plt
+
+                plt.close(fig)
+            except Exception as exc:
+                _warn_once(f"error map not logged: {exc}")
     except Exception as exc:
         _warn_once(str(exc))
 
 
-def rmse_vs_reference(surrogate, observable: str, domain) -> float | None:
-    """RMSE of the surrogate against the analytic reference EOS on a dense grid.
+def score_vs_reference(surrogate, observable: str, domain) -> dict:
+    """Accuracy (RMSE, R²) and confidence (mean epistemic std) of the surrogate
+    against the analytic reference EOS on a dense grid.
 
-    None if there's no analytic reference for this observable (e.g. diffusion).
-    Shared with scripts/backfill_mlflow.py so live and backfilled rounds are
-    scored identically.
+    - rmse_vs_reference: physical units (pressure/energy) — interpretable once
+      you're looking at one campaign, not comparable across observables.
+    - r_squared_vs_reference: fraction of the reference surface's variance the
+      surrogate explains, in [~-inf, 1]. Dimensionless, so THIS is what a
+      campaigns list ranks/sorts by — RMSE in pressure units isn't comparable
+      to RMSE in energy units.
+    - mean_epistemic_std: the model's own confidence (not accuracy against
+      ground truth) — shrinking alongside R² rising is what "the AL loop is
+      working" looks like; shrinking without R² rising means it's confidently
+      wrong.
+
+    Empty dict if there's no analytic reference for this observable (e.g.
+    diffusion). Shared with scripts/backfill_mlflow.py so live and backfilled
+    rounds are scored identically.
     """
     from mdal.analysis._common import reference_surface
 
@@ -132,6 +181,13 @@ def rmse_vs_reference(surrogate, observable: str, domain) -> float | None:
     try:
         truth = reference_surface(observable, grid)
     except KeyError:
-        return None  # no analytic reference for this observable (e.g. diffusion)
+        return {}  # no analytic reference for this observable (e.g. diffusion)
     pred, _ = surrogate.predict(grid)
-    return float(np.sqrt(np.mean((pred - truth) ** 2)))
+    resid = pred - truth
+    ss_res = float(np.sum(resid**2))
+    ss_tot = float(np.sum((truth - truth.mean()) ** 2))
+    return {
+        "rmse_vs_reference": float(np.sqrt(np.mean(resid**2))),
+        "r_squared_vs_reference": 1.0 - ss_res / ss_tot if ss_tot > 0 else float("nan"),
+        "mean_epistemic_std": float(np.mean(surrogate.epistemic_std(grid))),
+    }

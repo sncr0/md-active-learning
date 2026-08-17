@@ -33,9 +33,10 @@ def _connect() -> psycopg.Connection:
     return psycopg.connect(default_dsn(), row_factory=dict_row)
 
 
-def _shape_summary(row: dict) -> dict:
+def _shape_summary(row: dict, tracking: dict) -> dict:
     n_complete = row["n_complete"]
     n_total = max(row["n_total"] or 0, n_complete)
+    metrics = tracking.get("metrics", {})
     return {
         "id": row["id"],
         "name": row["name"],
@@ -46,6 +47,12 @@ def _shape_summary(row: dict) -> dict:
         "budget": {"n_initial": row["n_initial"] or 0, "n_total": n_total, "batch": row["batch"] or 0},
         "progress": (n_complete / n_total) if n_total else 1.0,
         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+        "tracking": {
+            "available": bool(tracking),
+            "n_rounds": tracking.get("n_rounds"),
+            "r_squared": metrics.get("r_squared_vs_reference"),
+            "rmse": metrics.get("rmse_vs_reference"),
+        },
     }
 
 
@@ -63,7 +70,11 @@ def list_campaigns() -> list[dict]:
             "GROUP BY r.campaign_id, c.name, c.strategy, c.observable, "
             "         c.n_initial, c.n_total, c.batch"
         ).fetchall()
-    summaries = [_shape_summary(r) for r in rows]
+    # MLflow tracking is optional/live telemetry, layered on top of the always-
+    # present Postgres provenance — one bulk lookup, fails soft to {} so a down
+    # tracking server just means blank performance columns, never a 5xx here.
+    tracking_by_id = mlflow_client.campaigns_summary()
+    summaries = [_shape_summary(r, tracking_by_id.get(r["id"], {})) for r in rows]
     summaries.sort(key=lambda s: (s["status"] != "running", s["name"]))
     return summaries
 

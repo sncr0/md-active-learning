@@ -142,16 +142,21 @@ def backfill_campaign(client: MlflowClient, exp_id: str, con, row: dict) -> None
             },
             run_name=f"round-{r}",
         )
-        metrics = {"round": float(r), "n_points": float(prefix_n), **surrogate.diagnostics()}
-        rmse = tracking.rmse_vs_reference(surrogate, observable, domain)
-        if rmse is not None:
-            metrics["rmse_vs_reference"] = rmse
+        score = {
+            **surrogate.diagnostics(),
+            **tracking.score_vs_reference(surrogate, observable, domain),
+        }
         client.log_batch(
             run.info.run_id,
             params=[Param("round", str(r)), Param("n_points", str(prefix_n))],
-            metrics=[Metric(k, v, round_start, 0) for k, v in metrics.items()
-                     if k not in ("round", "n_points")],
+            metrics=[Metric(k, v, round_start, 0) for k, v in score.items()],
         )
+        # Same step-indexed metrics on the parent run as live tracking.py logs —
+        # gives the campaign's own run page a native MLflow trend chart.
+        if score:
+            client.log_batch(
+                parent_id, metrics=[Metric(k, v, round_start, r) for k, v in score.items()],
+            )
         try:
             with mlflow.start_run(run_id=run.info.run_id):
                 mlflow.sklearn.log_model(
@@ -160,6 +165,17 @@ def backfill_campaign(client: MlflowClient, exp_id: str, con, row: dict) -> None
                 )
         except Exception as exc:
             print(f"    round {r}: model artifact not logged ({exc})")
+        try:
+            from mdal.analysis._common import error_map_figure
+
+            fig, _ = error_map_figure(surrogate, X[:prefix_n], domain, observable)
+            with mlflow.start_run(run_id=run.info.run_id):
+                mlflow.log_figure(fig, "error_map.png")
+            import matplotlib.pyplot as plt
+
+            plt.close(fig)
+        except Exception as exc:
+            print(f"    round {r}: error map not logged ({exc})")
         client.set_terminated(run.info.run_id, status="FINISHED", end_time=round_end)
         n_logged += 1
 

@@ -44,6 +44,13 @@ export interface Run {
   observations: Record<string, ObservationStat>
 }
 
+export interface CampaignTrackingSummary {
+  available: boolean
+  n_rounds: number | null
+  r_squared: number | null
+  rmse: number | null
+}
+
 export interface CampaignSummary {
   id: string
   name: string
@@ -54,6 +61,7 @@ export interface CampaignSummary {
   budget: Budget
   progress: number
   updated_at?: string
+  tracking: CampaignTrackingSummary
 }
 
 export interface CampaignDetail extends CampaignSummary {
